@@ -1,0 +1,17 @@
+{
+  "name": "Cancha 7 · Simulador de Fútbol 7",
+  "short_name": "Cancha 7",
+  "description": "Crea ligas de fútbol 7 y simula los partidos en tiempo real.",
+  "lang": "es",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0B1219",
+  "theme_color": "#0B1219",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
