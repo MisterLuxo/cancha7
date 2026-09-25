@@ -350,6 +350,15 @@ body{background:radial-gradient(900px 420px at 10% -140px,rgba(255,122,26,.20),t
 .pitch{box-shadow:inset 0 0 70px rgba(0,0,0,.38),0 14px 30px rgba(0,0,0,.35)}
 .seg button.on{background:linear-gradient(180deg,#2A3D51,#223244);box-shadow:inset 0 1px 0 rgba(255,255,255,.06)}
 
+/* v1.3: capitana */
+.av{overflow:visible}
+.av>.avi{width:100%;height:100%;border-radius:inherit;overflow:hidden;display:grid;place-items:center}
+.av .cap{position:absolute;right:-3px;bottom:-3px;border-radius:50%;background:linear-gradient(180deg,#FFD66B,#F2A900);color:#1A0C00;display:grid;place-items:center;font:800 10px/1 var(--disp);border:2px solid var(--bg);box-shadow:0 2px 6px rgba(0,0,0,.4);z-index:1}
+.capbtn{display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:12px;border:1.5px solid var(--line);background:var(--bg2);text-align:left}
+.capbtn.on{border-color:var(--gold);background:rgba(255,201,64,.08)}
+.capbtn .cc{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;font:800 16px/1 var(--disp);background:var(--surface3);color:var(--muted)}
+.capbtn.on .cc{background:linear-gradient(180deg,#FFD66B,#F2A900);color:#1A0C00}
+
 </style>
 </head><body><div id="app"></div>
 <script>
@@ -397,7 +406,8 @@ function fit(pPos, slot) {
 const W_ATT = { POR: 0, DEF: .25, MC: .7, DEL: 1 };
 const W_MID = { POR: .05, DEF: .32, MC: 1, DEL: .4 };
 const W_DEF = { POR: 0, DEF: .9, MC: .45, DEL: .15 };
-const W_SHOOT = { POR: 0, DEF: .7, MC: 2.2, DEL: 5 };
+const W_SHOOT = { POR: 0, DEF: .45, MC: 2, DEL: 6.5 };
+const FINISH = { POR: .6, DEF: .85, MC: 1, DEL: 1.12 }; // definición según el puesto
 const W_ASSIST = { POR: .05, DEF: 1.3, MC: 3, DEL: 2 };
 const W_FOUL = { POR: .3, DEF: 2.5, MC: 2, DEL: 1 };
 
@@ -541,7 +551,7 @@ function playMinute(M) {
       M.stats[t].sot++; shooter.sot++;
       const defAvg = S[o].def / 2.7;
       const gkE = gkD ? effOf(M, gkD.pid) : 20;
-      const pg = clamp(0.3 * Math.pow(e / (gkE * 0.6 + defAvg * 0.4 + 1), 0.5) * Math.pow(S[t].syn / S[o].syn, 0.5), .07, .62);
+      const pg = clamp(0.3 * Math.pow(e / (gkE * 0.6 + defAvg * 0.4 + 1), 0.5) * Math.pow(S[t].syn / S[o].syn, 0.5) * (FINISH[slotOf(M, shooter.pid)] ?? 1), .06, .65);
       if (R() < pg) {
         goal(M, t, shooter, true, false);
         mom = (t === 0 ? 1 : -1);
@@ -570,13 +580,23 @@ function playMinute(M) {
   }
 }
 const INJ_P = 0.0014; // ~1 lesión cada 8 partidos
+const INJ_FOUL_P = 0.4; // 40% de las lesiones las provoca una rival
 function injure(M, p) {
   const t = p.team, T = M.teams[t];
   const games = R() < .6 ? 1 : R() < .75 ? 2 : 3;
   p.inj = games; bump(p, -0.2);
   const f = T.field.find(x => x.pid === p.pid); if (!f) return;
   const slot = f.slot;
-  ev(M, { type: 'injury', team: t, pid: p.pid, games });
+  // ¿La provocó una rival con una falta?
+  const rivals = onField(M, 1 - t);
+  const fouler = rivals.length && R() < INJ_FOUL_P ? pick(rivals, q => W_FOUL[slotOf(M, q.pid)] ?? 1) : null;
+  ev(M, { type: 'injury', team: t, pid: p.pid, games, pid2: fouler ? fouler.pid : null });
+  if (fouler) {
+    M.stats[1 - t].fouls++; bump(fouler, -0.1);
+    // gravedad: 3 partidos casi siempre roja, 2 partidos a veces, 1 partido amarilla
+    const red = games >= 3 ? R() < .75 : games === 2 ? R() < .3 : false;
+    if (red) sendOff(M, fouler, 'red'); else giveYellow(M, fouler);
+  }
   const bench = T.bench.map(id => M.players[id]).filter(b => b && b.minIn === null && !b.out);
   if (T.subsLeft > 0 && bench.length) {
     const inP = bench.reduce((a, b) => (effSkill(b, slot) > effSkill(a, slot) ? b : a));
@@ -623,12 +643,14 @@ function penalty(M, t, o) {
   }
 }
 function card(M, p, pY) {
-  const t = p.team;
   if (R() < 0.009) { sendOff(M, p, 'red'); return; }
-  if (R() < pY) {
-    if (p.yc >= 1) { p.yc++; M.stats[t].yc++; sendOff(M, p, 'second'); }
-    else { p.yc++; M.stats[t].yc++; bump(p, -0.4); ev(M, { type: 'yellow', team: t, pid: p.pid }); }
-  }
+  if (R() < pY) giveYellow(M, p);
+}
+function giveYellow(M, p) {
+  const t = p.team;
+  if (p.out) return;
+  if (p.yc >= 1) { p.yc++; M.stats[t].yc++; sendOff(M, p, 'second'); }
+  else { p.yc++; M.stats[t].yc++; bump(p, -0.4); ev(M, { type: 'yellow', team: t, pid: p.pid }); }
 }
 function sendOff(M, p, kind) {
   const t = p.team; const T = M.teams[t];
@@ -922,7 +944,10 @@ function avatar(p, size = 40, team, cls = '') {
   const L = (team && team.logo) || {};
   const ini = p ? (p.name || '?').split(/\s+/).map(w => w[0]).slice(0, 2).join('').toUpperCase() : '?';
   const bg = L.c1 || 'var(--surface3)'; const fg = lum(L.c1) > 0.6 ? '#0B1219' : '#fff';
-  return `<span class="av ${cls}" style="width:${size}px;height:${size}px;${url ? '' : `background:${bg};color:${fg};font-size:${Math.round(size * .38)}px`}">${url ? `<img src="${url}" alt="">` : esc(ini)}</span>`;
+  const pid = p && (p.id || p.pid);
+  const cap = pid && (team && 'captain' in team ? team.captain === pid : DATA.teams.some(t => t.captain === pid));
+  const cs = Math.max(14, Math.round(size * .36));
+  return `<span class="av ${cls}" style="width:${size}px;height:${size}px"><span class="avi" style="${url ? '' : `background:${bg};color:${fg};font-size:${Math.round(size * .38)}px`}">${url ? `<img src="${url}" alt="">` : esc(ini)}</span>${cap ? `<b class="cap" title="Capitana" style="width:${cs}px;height:${cs}px;font-size:${Math.round(cs * .62)}px">C</b>` : ''}</span>`;
 }
 function shortName(n) { const w = String(n || '').trim().split(/\s+/); return w.length > 1 ? w[0][0] + '. ' + w.slice(1).join(' ') : w[0]; }
 function lastName(n) { const w = String(n || '').trim().split(/\s+/); return w.length > 1 ? w.slice(1).join(' ') : w[0]; }
@@ -967,7 +992,7 @@ function sampleData() {
       let nm; do { nm = first[Math.floor(rnd() * first.length)] + ' ' + last[Math.floor(rnd() * last.length)]; } while (used.has(nm)); used.add(nm);
       return { id: uid(), name: nm, pos, num: nums[i], skill: clampN(Math.round(t.base + (rnd() - .5) * 26 + (i === 6 ? 6 : 0)), 30, 96), photo: null };
     });
-    return { id: uid(), name: t.name, abbr: t.abbr, logo: t.logo, skill: t.skill, players, sample: true };
+    return { id: uid(), name: t.name, abbr: t.abbr, logo: t.logo, skill: t.skill, players, captain: players[5].id, sample: true };
   });
 }
 
@@ -1483,6 +1508,7 @@ function playerSheet(p, pl, num) {
   openSheet(`<h3>${isNew ? 'Nueva jugadora' : 'Editar jugadora'}</h3>
     <div class="photo-pick"><label style="cursor:pointer;position:relative" aria-label="Cambiar foto"><span id="phv">${avatar(w, 84, d, 'sq')}</span><span style="position:absolute;right:-6px;bottom:-6px;width:32px;height:32px;border-radius:50%;background:var(--accent);color:var(--accent-ink);display:grid;place-items:center">${IC.cam.replace('<svg', '<svg width="18" height="18"')}</span><input type="file" id="ph" accept="image/*" hidden></label>
     <div style="flex:1;font-size:13px" class="muted">Toca para elegir una foto. Se recorta en cuadrado (1:1) automáticamente.${w.photo ? '<br><button id="rmph" style="color:var(--rc);font-weight:600;margin-top:6px">Quitar foto</button>' : ''}</div></div>
+    <button class="capbtn ${d.captain === w.id ? 'on' : ''}" id="pcap" type="button"><span class="cc">C</span><div style="flex:1"><div style="font-weight:700">Capitana del equipo</div><div class="muted" style="font-size:13px">${d.captain && d.captain !== w.id ? 'Reemplaza a la capitana actual' : 'Lleva la C en su foto'}</div></div><span class="chk" style="${d.captain === w.id ? 'background:var(--gold);border-color:var(--gold)' : ''}"></span></button>
     <div class="field"><label for="pn">Nombre y apellido</label><input class="inp" id="pn" maxlength="32" value="${esc(w.name)}" placeholder="Ej: Camila Soto"></div>
     <div class="grid2" style="grid-template-columns:96px 1fr"><div class="field"><label for="pd">Dorsal</label><input class="inp num" id="pd" type="number" inputmode="numeric" min="1" max="99" value="${w.num}"></div>
     <div class="field"><label for="pp">Posición</label><select class="inp" id="pp">${opts}</select></div></div>
@@ -1497,13 +1523,16 @@ function playerSheet(p, pl, num) {
       catch (err) { $('#perr', bg).textContent = 'No se pudo leer esa imagen. Prueba con otra (JPG o PNG).'; }
     };
     const rm = $('#rmph', bg); if (rm) rm.onclick = () => { w.photo = null; $('#phv', bg).innerHTML = avatar(w, 84, d, 'sq'); rm.remove(); };
+    let cap = d.captain === w.id;
+    $('#pcap', bg).onclick = e => { cap = !cap; e.currentTarget.classList.toggle('on', cap); const k = e.currentTarget.querySelector('.chk'); k.style.background = cap ? 'var(--gold)' : ''; k.style.borderColor = cap ? 'var(--gold)' : ''; };
     const c = $('#pc', bg); if (c) c.onclick = closeSheet;
-    const dl = $('#pdel', bg); if (dl) dl.onclick = () => { d.players = d.players.filter(x => x.id !== w.id); p.dirty = true; closeSheet(); p._scroll = scrollY; render(); };
+    const dl = $('#pdel', bg); if (dl) dl.onclick = () => { if (d.captain === w.id) d.captain = null; d.players = d.players.filter(x => x.id !== w.id); p.dirty = true; closeSheet(); p._scroll = scrollY; render(); };
     $('#pok', bg).onclick = () => {
       w.name = $('#pn', bg).value.trim(); w.num = clampN(parseInt($('#pd', bg).value) || 1, 1, 99); w.pos = $('#pp', bg).value;
       if (!w.name) { $('#perr', bg).textContent = 'Escribe el nombre de la jugadora.'; return; }
       if (d.players.some(x => x.id !== w.id && x.num === w.num)) { $('#perr', bg).textContent = `El dorsal ${w.num} ya lo usa otra jugadora.`; return; }
       const i = d.players.findIndex(x => x.id === w.id); if (i >= 0) d.players[i] = w; else d.players.push(w);
+      if (cap) d.captain = w.id; else if (d.captain === w.id) d.captain = null;
       p.dirty = true; closeSheet(); p._scroll = scrollY; render();
     };
   });
@@ -1530,7 +1559,7 @@ SCREENS.settings = {
       <div class="sec-t"><h2>Instalar en Android</h2></div>
       <div class="card" style="padding:14px;font-size:14px;line-height:1.5"><ol style="margin:0;padding-left:20px;display:flex;flex-direction:column;gap:6px">
         <li>Abre la app en <b>Chrome</b>.</li><li>Toca el menú <b>⋮</b> y elige <b>Instalar app</b> (o <b>Añadir a pantalla de inicio</b>).</li><li>Se abrirá desde su ícono, a pantalla completa y sin internet.</li></ol></div>
-      <p class="muted" style="text-align:center;font-size:12px;margin:4px 0 0">Cancha 7 · v1.2</p>
+      <p class="muted" style="text-align:center;font-size:12px;margin:4px 0 0">Cancha 7 · v1.3</p>
     </main>${tabbar('settings')}`;
   },
   after() {
@@ -1673,7 +1702,7 @@ function evHTML(e, info, T, cols) {
     case 'yellow': ic = IC.yc; k = 'Tarjeta amarilla'; break;
     case 'second': ic = IC.y2; k = 'Doble amarilla'; s = 'Expulsada'; break;
     case 'red': ic = IC.rc; k = 'Tarjeta roja'; s = 'Expulsada'; break;
-    case 'injury': ic = IC.inj; k = 'Lesión'; s = 'Baja: ' + e.games + (e.games === 1 ? ' partido' : ' partidos'); break;
+    case 'injury': ic = IC.inj; k = 'Lesión'; s = 'Baja: ' + e.games + (e.games === 1 ? ' partido' : ' partidos') + (p2 ? ' · Falta de ' + esc(p2.name) : ''); break;
     case 'sub': ic = IC.sub; k = 'Cambio'; nm = 'Entra: ' + esc(p.name); s = p2 ? 'Sale: ' + esc(p2.name) : ''; break;
     case 'soGoal': ic = IC.ball; k = 'Anota'; s = `Tanda ${e.so[0]}-${e.so[1]}`; break;
     case 'soMiss': ic = IC.ballMiss; k = 'Falla'; s = `Tanda ${e.so[0]}-${e.so[1]}`; break;
