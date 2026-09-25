@@ -384,6 +384,7 @@ const FORM_MOD = {
 // Ventajas tácticas: la formación de la izquierda saca ventaja sobre la de la derecha
 const FORM_BEATS = { '1-2-3-1': '1-3-1-2', '1-3-1-2': '1-2-2-2', '1-2-2-2': '1-3-2-1', '1-3-2-1': '1-2-3-1' };
 const EDGE = { att: 1.08, mid: 1.04, def: 1.06 };
+const DOWN_PEN = 0.05; // por cada jugadora de menos respecto a la rival
 // coordenadas de cada puesto (x %, y % desde el arco propio abajo)
 const FORM_XY = {
   '1-3-2-1': [[50, 88], [16, 64], [50, 66], [84, 64], [30, 42], [70, 42], [50, 16]],
@@ -485,7 +486,10 @@ function teamStrength(M, t) {
   const syn = 0.85 + 0.3 * (T.skill / 100);
   const fm = FORM_MOD[T.formation] || { att: 1, mid: 1, def: 1, chance: 1 };
   const e = FORM_BEATS[T.formation] === M.teams[1 - t].formation ? EDGE : { att: 1, mid: 1, def: 1 };
-  return { att: att * syn * fm.att * e.att + 1, mid: mid * syn * fm.mid * e.mid + 1, def: def * syn * fm.def * e.def + 1, gk: gk * (0.9 + 0.2 * T.skill / 100), syn, chance: fm.chance };
+  // inferioridad numérica: además de perder a la jugadora, el equipo se desordena un poco
+  const down = Math.max(0, M.teams[1 - t].field.length - T.field.length);
+  const nf = 1 - DOWN_PEN * down;
+  return { att: att * syn * fm.att * e.att * nf + 1, mid: mid * syn * fm.mid * e.mid * nf + 1, def: def * syn * fm.def * e.def * nf + 1, gk: gk * (0.9 + 0.2 * T.skill / 100), syn, chance: fm.chance };
 }
 function effOf(M, pid) {
   const p = M.players[pid]; const T = M.teams[p.team];
@@ -1635,7 +1639,7 @@ SCREENS.settings = {
       <div class="sec-t"><h2>Instalar en Android</h2></div>
       <div class="card" style="padding:14px;font-size:14px;line-height:1.5"><ol style="margin:0;padding-left:20px;display:flex;flex-direction:column;gap:6px">
         <li>Abre la app en <b>Chrome</b>.</li><li>Toca el menú <b>⋮</b> y elige <b>Instalar app</b> (o <b>Añadir a pantalla de inicio</b>).</li><li>Se abrirá desde su ícono, a pantalla completa y sin internet.</li></ol></div>
-      <p class="muted" style="text-align:center;font-size:12px;margin:4px 0 0">Cancha 7 · v1.7.2</p>
+      <p class="muted" style="text-align:center;font-size:12px;margin:4px 0 0">Cancha 7 · v1.7.3</p>
     </main>${tabbar('settings')}`;
   },
   after() {
