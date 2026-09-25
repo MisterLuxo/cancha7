@@ -1022,7 +1022,7 @@ function avatar(p, size = 40, team, cls = '') {
   const pid = p && (p.id || p.pid);
   const cap = pid && (team && 'captain' in team ? team.captain === pid : DATA.teams.some(t => t.captain === pid));
   const cs = Math.max(14, Math.round(size * .36));
-  return `<span class="av ${cls}" style="width:${size}px;height:${size}px"><span class="avi" style="${url ? '' : `background:${bg};color:${fg};font-size:${Math.round(size * .38)}px`}">${url ? `<img src="${url}" alt="">` : esc(ini)}</span>${cap ? `<b class="cap" title="Capitana" style="width:${cs}px;height:${cs}px;font-size:${Math.round(cs * .62)}px">C</b>` : ''}</span>`;
+  return `<span class="av ${cls}" style="width:${size}px;height:${size}px"><span class="avi" style="background:${url ? `radial-gradient(circle at 50% 35%, color-mix(in srgb, ${bg} 70%, #fff), ${bg} 75%)` : bg};${url ? '' : `color:${fg};font-size:${Math.round(size * .38)}px`}">${url ? `<img src="${url}" alt="">` : esc(ini)}</span>${cap ? `<b class="cap" title="Capitana" style="width:${cs}px;height:${cs}px;font-size:${Math.round(cs * .62)}px">C</b>` : ''}</span>`;
 }
 function shortName(n) { const w = String(n || '').trim().split(/\s+/); return w.length > 1 ? w[0][0] + '. ' + w.slice(1).join(' ') : w[0]; }
 function lastName(n) { const w = String(n || '').trim().split(/\s+/); return w.length > 1 ? w.slice(1).join(' ') : w[0]; }
@@ -1038,7 +1038,11 @@ function readPhoto(file) {
         const c = document.createElement('canvas'); c.width = c.height = out;
         const x = c.getContext('2d'); x.imageSmoothingQuality = 'high';
         x.drawImage(img, (img.width - s) / 2, (img.height - s) / 2, s, s, 0, 0, out, out);
-        res(c.toDataURL('image/jpeg', 0.84));
+        // si la imagen tiene transparencia (PNG/WebP), se conserva
+        let alpha = false;
+        try { const d = x.getImageData(0, 0, out, out).data; for (let i = 3; i < d.length; i += 16) if (d[i] < 250) { alpha = true; break; } } catch (e) { }
+        if (alpha) { const w = c.toDataURL('image/webp', 0.9); res(w.startsWith('data:image/webp') ? w : c.toDataURL('image/png')); }
+        else res(c.toDataURL('image/jpeg', 0.84));
       };
       img.onerror = rej; img.src = fr.result;
     };
@@ -1635,7 +1639,7 @@ function playerSheet(p, pl, num) {
   const opts = Object.keys(POS).map(k => `<option value="${k}" ${w.pos === k ? 'selected' : ''}>${POS[k]}</option>`).join('');
   openSheet(`<h3>${isNew ? 'Nueva jugadora' : 'Editar jugadora'}</h3>
     <div class="photo-pick"><label style="cursor:pointer;position:relative" aria-label="Cambiar foto"><span id="phv">${avatar(w, 84, d, 'sq')}</span><span style="position:absolute;right:-6px;bottom:-6px;width:32px;height:32px;border-radius:50%;background:var(--accent);color:var(--accent-ink);display:grid;place-items:center">${IC.cam.replace('<svg', '<svg width="18" height="18"')}</span><input type="file" id="ph" accept="image/*" hidden></label>
-    <div style="flex:1;font-size:13px" class="muted">Toca para elegir una foto. Se recorta en cuadrado (1:1) automáticamente.${w.photo ? '<br><button id="rmph" style="color:var(--rc);font-weight:600;margin-top:6px">Quitar foto</button>' : ''}</div></div>
+    <div style="flex:1;font-size:13px" class="muted">Toca para elegir una foto. Se recorta en cuadrado (1:1). Si es PNG con fondo transparente, se ve con el color del equipo detrás.${w.photo ? '<br><button id="rmph" style="color:var(--rc);font-weight:600;margin-top:6px">Quitar foto</button>' : ''}</div></div>
     <button class="capbtn ${d.captain === w.id ? 'on' : ''}" id="pcap" type="button"><span class="cc">C</span><div style="flex:1"><div style="font-weight:700">Capitana del equipo</div><div class="muted" style="font-size:13px">${d.captain && d.captain !== w.id ? 'Reemplaza a la capitana actual' : 'Lleva la C en su foto'}</div></div><span class="chk" style="${d.captain === w.id ? 'background:var(--gold);border-color:var(--gold)' : ''}"></span></button>
     <div class="field"><label for="pn">Nombre y apellido</label><input class="inp" id="pn" maxlength="32" value="${esc(w.name)}" placeholder="Ej: Camila Soto"></div>
     <div class="grid2" style="grid-template-columns:96px 1fr"><div class="field"><label for="pd">Dorsal</label><input class="inp num" id="pd" type="number" inputmode="numeric" min="1" max="99" value="${w.num}"></div>
@@ -1687,7 +1691,7 @@ SCREENS.settings = {
       <div class="sec-t"><h2>Instalar en Android</h2></div>
       <div class="card" style="padding:14px;font-size:14px;line-height:1.5"><ol style="margin:0;padding-left:20px;display:flex;flex-direction:column;gap:6px">
         <li>Abre la app en <b>Chrome</b>.</li><li>Toca el menú <b>⋮</b> y elige <b>Instalar app</b> (o <b>Añadir a pantalla de inicio</b>).</li><li>Se abrirá desde su ícono, a pantalla completa y sin internet.</li></ol></div>
-      <p class="muted" style="text-align:center;font-size:12px;margin:4px 0 0">Cancha 7 · v1.8</p>
+      <p class="muted" style="text-align:center;font-size:12px;margin:4px 0 0">Cancha 7 · v1.8.1</p>
     </main>${tabbar('settings')}`;
   },
   after() {
