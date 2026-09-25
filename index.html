@@ -358,6 +358,10 @@ body{background:radial-gradient(900px 420px at 10% -140px,rgba(255,122,26,.20),t
 .capbtn.on{border-color:var(--gold);background:rgba(255,201,64,.08)}
 .capbtn .cc{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;font:800 16px/1 var(--disp);background:var(--surface3);color:var(--muted)}
 .capbtn.on .cc{background:linear-gradient(180deg,#FFD66B,#F2A900);color:#1A0C00}
+/* v1.8: selector de escudo en grilla (se ven todas las opciones) */
+.pickrow{display:grid;grid-template-columns:repeat(auto-fill,minmax(54px,1fr));gap:8px;overflow:visible;padding:2px}
+.pick{width:auto;height:auto;aspect-ratio:1;max-width:100%}
+.pick svg{width:78%;height:78%}
 
 </style>
 </head><body><div id="app"></div>
@@ -909,27 +913,45 @@ const IC = {
 const SHAPES = {
   escudo: 'M50 4 L92 15 V48 C92 74 72 90 50 97 C28 90 8 74 8 48 V15 Z',
   clasico: 'M9 6 H91 V50 C91 76 70 90 50 97 C30 90 9 76 9 50 Z',
+  moderno: 'M8 12 Q30 16 50 4 Q70 16 92 12 V50 C92 75 72 90 50 97 C28 90 8 75 8 50 Z',
+  blason: 'M8 6 H92 V56 A42 41 0 0 1 8 56 Z',
   circulo: 'M50 4 A46 46 0 1 1 49.99 4 Z',
   hexagono: 'M50 3 L91 26 V74 L50 97 L9 74 V26 Z',
+  octogono: 'M31 4 H69 L96 31 V69 L69 96 H31 L4 69 V31 Z',
+  pentagono: 'M50 3 L96 37 L79 95 H21 L4 37 Z',
   cuadrado: 'M24 6 H76 Q94 6 94 24 V76 Q94 94 76 94 H24 Q6 94 6 76 V24 Q6 6 24 6 Z',
   rombo: 'M50 3 L97 50 L50 97 L3 50 Z',
   banda: 'M12 5 H88 V78 L50 97 L12 78 Z',
 };
+// diseños centrados y simétricos (sobre un lienzo de 100x100)
+const band = (c, w, vert) => vert ? `<rect x="${c - w / 2}" y="-5" width="${w}" height="110"/>` : `<rect x="-5" y="${c - w / 2}" width="110" height="${w}"/>`;
+const waves = [30, 50, 70].map(c => `<path d="M-5 ${c - 5} Q7.5 ${c - 13} 20 ${c - 5} T45 ${c - 5} T70 ${c - 5} T95 ${c - 5} T120 ${c - 5} V${c + 5} Q107.5 ${c - 3} 95 ${c + 5} T70 ${c + 5} T45 ${c + 5} T20 ${c + 5} T-5 ${c + 5} Z"/>`).join('');
+const checker = (() => { let o = ''; for (let i = 0; i < 5; i++) for (let j = 0; j < 5; j++) if ((i + j) % 2) o += `<rect x="${i * 20}" y="${j * 20}" width="20" height="20"/>`; return o; })();
+const rays = (() => { let o = ''; for (let i = 0; i < 12; i += 2) { const a1 = i * Math.PI / 6 - Math.PI / 2, a2 = (i + 1) * Math.PI / 6 - Math.PI / 2; o += `<polygon points="50,50 ${(50 + 90 * Math.cos(a1)).toFixed(1)},${(50 + 90 * Math.sin(a1)).toFixed(1)} ${(50 + 90 * Math.cos(a2)).toFixed(1)},${(50 + 90 * Math.sin(a2)).toFixed(1)}"/>`; } return o; })();
 const PATTERNS = {
   liso: '',
-  mitades: '<rect x="50" y="0" width="50" height="100"/>',
-  rayas: '<rect x="10" y="0" width="10" height="100"/><rect x="30" y="0" width="10" height="100"/><rect x="50" y="0" width="10" height="100"/><rect x="70" y="0" width="10" height="100"/><rect x="90" y="0" width="10" height="100"/>',
-  aros: '<rect x="0" y="12" width="100" height="11"/><rect x="0" y="34" width="100" height="11"/><rect x="0" y="56" width="100" height="11"/><rect x="0" y="78" width="100" height="11"/>',
-  franja: '<rect x="0" y="36" width="100" height="28"/>',
-  vertical: '<rect x="36" y="0" width="28" height="100"/>',
-  diagonal: '<polygon points="-10,76 76,-10 104,18 18,104"/>',
-  cuartos: '<rect x="50" y="0" width="50" height="50"/><rect x="0" y="50" width="50" height="50"/>',
-  chevron: '<polygon points="0,26 50,58 100,26 100,50 50,82 0,50"/>',
-  cruz: '<rect x="41" y="0" width="18" height="100"/><rect x="0" y="36" width="100" height="18"/>',
-  corona: '<rect x="0" y="0" width="100" height="34"/>',
+  mitades: '<rect x="50" y="-5" width="55" height="110"/>',
+  rayas: [10, 30, 50, 70, 90].map(c => band(c, 10, true)).join(''),
+  aros: [14, 32, 50, 68, 86].map(c => band(c, 9, false)).join(''),
+  franja: band(50, 28, false),
+  vertical: band(50, 28, true),
+  diagonal: '<polygon points="-10,82 82,-10 110,18 18,110"/>',
+  rayasdiag: `<g transform="rotate(45 50 50)">${[-40, -20, 0, 20, 40].map(d => band(50 + d, 9, true).replace('y="-5" ', 'y="-30" ').replace('height="110"', 'height="160"')).join('')}</g>`,
+  cuartos: '<rect x="50" y="-5" width="55" height="55"/><rect x="-5" y="50" width="55" height="55"/>',
+  damero: checker,
+  chevron: '<polygon points="-5,24 50,56 105,24 105,48 50,80 -5,48"/>',
+  cruz: band(50, 18, true) + band(50, 18, false),
+  aspa: '<g transform="rotate(45 50 50)">' + band(50, 16, true).replace('y="-5" ', 'y="-30" ').replace('height="110"', 'height="160"') + band(50, 16, false).replace('x="-5" ', 'x="-30" ').replace('width="110"', 'width="160"') + '</g>',
+  corona: '<rect x="-5" y="-5" width="110" height="39"/>',
+  punta: '<polygon points="50,40 110,110 -10,110"/>',
+  ondas: waves,
+  rayos: rays,
+  marco: 'MARCO',
+  degradado: 'GRAD',
 };
 function starPts(cx, cy, R, r, n = 5) { let s = []; for (let i = 0; i < n * 2; i++) { const a = -Math.PI / 2 + i * Math.PI / n; const rr = i % 2 ? r : R; s.push((cx + rr * Math.cos(a)).toFixed(1) + ',' + (cy + rr * Math.sin(a)).toFixed(1)); } return s.join(' '); }
 function sunRays() { let s = ''; for (let i = 0; i < 8; i++) { const a = i * Math.PI / 4; const p = (d, o) => (50 + d * Math.cos(a + o)).toFixed(1) + ',' + (50 + d * Math.sin(a + o)).toFixed(1); s += `<polygon points="${p(48, 0)} ${p(32, .2)} ${p(32, -.2)}"/>`; } return s + '<circle cx="50" cy="50" r="24"/>'; }
+function flake() { let s = ''; for (let i = 0; i < 3; i++) s += `<g transform="rotate(${i * 60} 50 50)"><rect x="45" y="2" width="10" height="96" rx="4"/><polygon points="50,14 64,4 68,10 50,24 32,10 36,4"/><polygon points="50,86 64,96 68,90 50,76 32,90 36,96"/></g>`; return s + '<circle cx="50" cy="50" r="12"/>'; }
 const SYMBOLS = {
   ninguno: '',
   iniciales: 'TEXT',
@@ -945,6 +967,14 @@ const SYMBOLS = {
   gema: '<polygon points="18,34 34,10 66,10 82,34 50,94"/>',
   hoja: '<path d="M50 97 C8 70 8 30 50 3 C92 30 92 70 50 97Z"/>',
   ala: '<path d="M6 30 C30 30 60 24 94 8 C88 30 76 44 60 50 C74 50 82 52 90 56 C74 70 56 74 40 72 C48 78 52 84 56 94 C30 90 12 66 6 30Z"/>',
+  nota: '<ellipse cx="34" cy="78" rx="19" ry="14" transform="rotate(-20 34 78)"/><rect x="45" y="8" width="9" height="72"/><path d="M54 8 C74 14 88 28 82 50 C78 36 68 30 54 30 Z"/>',
+  microfono: '<rect x="34" y="2" width="32" height="52" rx="16"/><path d="M18 42 H27 V50 A23 23 0 0 0 73 50 V42 H82 V50 A32 32 0 0 1 18 50 Z"/><rect x="45" y="80" width="10" height="10"/><rect x="28" y="88" width="44" height="9" rx="3"/>',
+  gato: '<path d="M12 30 L18 2 L40 20 Q50 17 60 20 L82 2 L88 30 Q98 46 92 66 Q82 96 50 96 Q18 96 8 66 Q2 46 12 30 Z"/><ellipse class="k" cx="34" cy="52" rx="6" ry="9"/><ellipse class="k" cx="66" cy="52" rx="6" ry="9"/><polygon class="k" points="44,68 56,68 50,76"/>',
+  huella: '<ellipse cx="50" cy="70" rx="25" ry="21"/><ellipse cx="17" cy="42" rx="10" ry="13" transform="rotate(-20 17 42)"/><ellipse cx="37" cy="20" rx="10" ry="14"/><ellipse cx="63" cy="20" rx="10" ry="14"/><ellipse cx="83" cy="42" rx="10" ry="13" transform="rotate(20 83 42)"/>',
+  copo: flake(),
+  trebol: '<circle cx="50" cy="28" r="21"/><circle cx="27" cy="58" r="21"/><circle cx="73" cy="58" r="21"/><rect x="45" y="56" width="10" height="42" rx="3"/>',
+  ancla: '<circle cx="50" cy="13" r="11"/><circle class="k" cx="50" cy="13" r="5"/><rect x="30" y="28" width="40" height="9" rx="3"/><path d="M45 24 H55 V82 C68 80 78 72 82 60 L73 58 L88 44 L95 64 L87 62 C81 82 65 94 50 96 C35 94 19 82 13 62 L5 64 L12 44 L27 58 L18 60 C22 72 32 80 45 82 Z"/>',
+  espada: '<g transform="rotate(45 50 50)"><rect x="45" y="0" width="10" height="70"/><polygon points="45,0 50,-8 55,0"/><rect x="30" y="68" width="40" height="8" rx="3"/><rect x="46" y="76" width="8" height="16"/></g><g transform="rotate(-45 50 50)"><rect x="45" y="0" width="10" height="70"/><polygon points="45,0 50,-8 55,0"/><rect x="30" y="68" width="40" height="8" rx="3"/><rect x="46" y="76" width="8" height="16"/></g>',
 };
 const PALETTE = ['#E53935', '#8E1B24', '#FF7A1A', '#FFC940', '#FFFFFF', '#15171A', '#1E88E5', '#0D2A6B', '#74C7F5', '#1F7A3A', '#7ED957', '#00897B', '#6A2FB0', '#EC407A', '#7A5A45', '#9AA4AE'];
 let crestN = 0;
@@ -953,18 +983,36 @@ function crestSVG(team, size = 40) {
   const L = Object.assign({ shape: 'escudo', pattern: 'liso', symbol: 'iniciales', c1: '#1E88E5', c2: '#FFFFFF' }, (team && team.logo) || {});
   const id = 'cr' + (++crestN);
   const shape = SHAPES[L.shape] || SHAPES.escudo;
+  const pat = PATTERNS[L.pattern] ?? '';
   const solid = L.pattern === 'liso';
-  const fill = solid ? L.c2 : L.c1, stroke = solid ? L.c1 : L.c2;
+  const plainBg = solid || pat === 'MARCO' || pat === 'GRAD';
+  // el símbolo usa el color que más contrasta con el fondo que queda detrás
+  const fill = plainBg ? L.c2 : L.c1, stroke = plainBg ? L.c1 : L.c2;
+  const inner = `transform="translate(50 50) scale(.8) translate(-50 -50)"`;
+  let bg = `<rect x="-5" y="-5" width="110" height="110" fill="${L.c1}"/>`;
+  if (pat === 'MARCO') bg = `<rect x="-5" y="-5" width="110" height="110" fill="${L.c2}"/><path d="${shape}" ${inner} fill="${L.c1}"/>`;
+  else if (pat === 'GRAD') bg = `<rect x="-5" y="-5" width="110" height="110" fill="url(#${id}d)"/>`;
+  else if (pat) bg += `<g fill="${L.c2}">${pat}</g>`;
   let sym = '';
+  const sw = plainBg ? 0 : 9;
   if (L.symbol === 'iniciales') {
     const t = ((team && team.abbr) || '?').slice(0, 3);
     const fs = t.length >= 3 ? 34 : t.length === 2 ? 42 : 52;
-    sym = `<text x="50" y="${(solid ? 50 : 50) + fs * 0.36}" text-anchor="middle" font-family="Barlow Condensed,Arial Narrow,sans-serif" font-weight="800" font-size="${fs}" fill="${fill}" stroke="${stroke}" stroke-width="${solid ? 0 : 5}" paint-order="stroke" letter-spacing="1">${esc(t)}</text>`;
+    const txt = (dx, dy, f, extra) => `<text x="${50 + dx}" y="${50 + fs * 0.36 + dy}" text-anchor="middle" font-family="Barlow Condensed,Arial Narrow,sans-serif" font-weight="800" font-size="${fs}" letter-spacing="1" ${extra}>${esc(t)}</text>`;
+    sym = txt(1.5, 2.5, '', 'fill="rgba(0,0,0,.3)"') + txt(0, 0, '', `fill="${fill}" stroke="${stroke}" stroke-width="${plainBg ? 0 : 5}" paint-order="stroke"`);
   } else if (SYMBOLS[L.symbol]) {
-    const inner = L.symbol === 'balon' ? SYMBOLS.balon.replace('class="k"', `fill="${stroke}"`) : SYMBOLS[L.symbol];
-    sym = `<g transform="translate(27 26) scale(.46)" fill="${fill}" stroke="${stroke}" stroke-width="${solid ? 0 : 9}" paint-order="stroke" stroke-linejoin="round">${inner}</g>`;
+    const src = SYMBOLS[L.symbol];
+    const g = (tr, attrs, body) => `<g transform="${tr} translate(27 26) scale(.46)" ${attrs} stroke-linejoin="round">${body}</g>`;
+    sym = g('translate(1.5 2.5)', `fill="rgba(0,0,0,.3)" stroke="rgba(0,0,0,.3)" stroke-width="${sw}"`, src.replace(/class="k"/g, 'fill="none" stroke="none"'))
+      + g('', `fill="${fill}" stroke="${stroke}" stroke-width="${sw}" paint-order="stroke"`, src.replace(/class="k"/g, `fill="${stroke}" stroke="none"`));
   }
-  return `<svg class="crest" width="${size}" height="${size}" viewBox="0 0 100 100" aria-hidden="true"><defs><clipPath id="${id}"><path d="${shape}"/></clipPath></defs><g clip-path="url(#${id})"><rect width="100" height="100" fill="${L.c1}"/><g fill="${L.c2}">${PATTERNS[L.pattern] || ''}</g>${sym}<path d="${shape}" fill="none" stroke="${solid ? L.c2 : 'rgba(0,0,0,.28)'}" stroke-width="7"/></g><path d="${shape}" fill="none" stroke="rgba(0,0,0,.35)" stroke-width="1.5"/></svg>`;
+  const ring = solid ? L.c2 : 'rgba(255,255,255,.6)';
+  return `<svg class="crest" width="${size}" height="${size}" viewBox="0 0 100 100" aria-hidden="true"><defs><clipPath id="${id}"><path d="${shape}"/></clipPath>`
+    + `<radialGradient id="${id}g" cx="32%" cy="18%" r="85%"><stop offset="0" stop-color="#fff" stop-opacity=".38"/><stop offset=".45" stop-color="#fff" stop-opacity=".05"/><stop offset="1" stop-color="#000" stop-opacity=".28"/></radialGradient>`
+    + (pat === 'GRAD' ? `<linearGradient id="${id}d" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${L.c1}"/><stop offset="1" stop-color="${L.c2}"/></linearGradient>` : '')
+    + `</defs><g clip-path="url(#${id})">${bg}${sym}<rect x="-5" y="-5" width="110" height="110" fill="url(#${id}g)"/><path d="${shape}" fill="none" stroke="rgba(0,0,0,.35)" stroke-width="7"/></g>`
+    + `<path d="${shape}" transform="translate(50 50) scale(.9) translate(-50 -50)" fill="none" stroke="${ring}" stroke-width="2.2" opacity=".85"/>`
+    + `<path d="${shape}" fill="none" stroke="rgba(0,0,0,.45)" stroke-width="1.6"/></svg>`;
 }
 function avatar(p, size = 40, team, cls = '') {
   const url = p && p.photo && PHOTOS[p.photo];
@@ -1639,7 +1687,7 @@ SCREENS.settings = {
       <div class="sec-t"><h2>Instalar en Android</h2></div>
       <div class="card" style="padding:14px;font-size:14px;line-height:1.5"><ol style="margin:0;padding-left:20px;display:flex;flex-direction:column;gap:6px">
         <li>Abre la app en <b>Chrome</b>.</li><li>Toca el menú <b>⋮</b> y elige <b>Instalar app</b> (o <b>Añadir a pantalla de inicio</b>).</li><li>Se abrirá desde su ícono, a pantalla completa y sin internet.</li></ol></div>
-      <p class="muted" style="text-align:center;font-size:12px;margin:4px 0 0">Cancha 7 · v1.7.3</p>
+      <p class="muted" style="text-align:center;font-size:12px;margin:4px 0 0">Cancha 7 · v1.8</p>
     </main>${tabbar('settings')}`;
   },
   after() {
