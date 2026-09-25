@@ -285,7 +285,7 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
 .so .dots i{width:16px;height:16px;border-radius:50%;border:2px solid var(--faint)}
 .so .dots i.y{background:var(--good);border-color:var(--good)}
 .so .dots i.n{background:var(--rc);border-color:var(--rc)}
-.endbar{padding:12px 16px calc(12px + env(safe-area-inset-bottom,0px));position:sticky;bottom:0;background:linear-gradient(to top,var(--bg) 75%,rgba(11,18,25,0))}
+.endbar{padding:12px 16px calc(12px + env(safe-area-inset-bottom,0px));position:sticky;bottom:0;z-index:10;background:linear-gradient(to top,var(--bg) 75%,rgba(11,18,25,0))}
 
 /* resumen */
 .stat{display:grid;grid-template-columns:44px 1fr 44px;gap:8px;align-items:center;padding:9px 14px}
@@ -353,7 +353,7 @@ body{background:radial-gradient(900px 420px at 10% -140px,rgba(255,122,26,.20),t
 /* v1.3: capitana */
 .av{overflow:visible}
 .av>.avi{width:100%;height:100%;border-radius:inherit;overflow:hidden;display:grid;place-items:center}
-.av .cap{position:absolute;right:-3px;bottom:-3px;border-radius:50%;background:linear-gradient(180deg,#FFD66B,#F2A900);color:#1A0C00;display:grid;place-items:center;font:800 10px/1 var(--disp);border:2px solid var(--bg);box-shadow:0 2px 6px rgba(0,0,0,.4);z-index:1}
+.av .cap{position:absolute;right:-3px;bottom:-3px;border-radius:50%;background:linear-gradient(180deg,#FFD66B,#F2A900);color:#1A0C00;display:grid;place-items:center;font:800 10px/1 var(--disp);border:2px solid var(--bg);box-shadow:0 2px 6px rgba(0,0,0,.4)}
 .capbtn{display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:12px;border:1.5px solid var(--line);background:var(--bg2);text-align:left}
 .capbtn.on{border-color:var(--gold);background:rgba(255,201,64,.08)}
 .capbtn .cc{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;font:800 16px/1 var(--disp);background:var(--surface3);color:var(--muted)}
@@ -1633,7 +1633,7 @@ SCREENS.settings = {
       <div class="sec-t"><h2>Instalar en Android</h2></div>
       <div class="card" style="padding:14px;font-size:14px;line-height:1.5"><ol style="margin:0;padding-left:20px;display:flex;flex-direction:column;gap:6px">
         <li>Abre la app en <b>Chrome</b>.</li><li>Toca el menú <b>⋮</b> y elige <b>Instalar app</b> (o <b>Añadir a pantalla de inicio</b>).</li><li>Se abrirá desde su ícono, a pantalla completa y sin internet.</li></ol></div>
-      <p class="muted" style="text-align:center;font-size:12px;margin:4px 0 0">Cancha 7 · v1.7</p>
+      <p class="muted" style="text-align:center;font-size:12px;margin:4px 0 0">Cancha 7 · v1.7.1</p>
     </main>${tabbar('settings')}`;
   },
   after() {
