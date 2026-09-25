@@ -565,17 +565,17 @@ function playMinute(M) {
       M.stats[t].sot++; shooter.sot++;
       const defAvg = S[o].def / 2.7;
       const gkE = gkD ? effOf(M, gkD.pid) : 20;
-      const pg = clamp(0.3 * Math.pow(e / (gkE * 0.6 + defAvg * 0.4 + 1), 0.5) * Math.pow(S[t].syn / S[o].syn, 0.5) * (FINISH[slotOf(M, shooter.pid)] ?? 1), .06, .65);
+      const pg = clamp(0.285 * Math.pow(e / (gkE * 0.7 + defAvg * 0.72 * 0.3 + 1), 0.75) * Math.pow(S[t].syn / S[o].syn, 0.5) * (FINISH[slotOf(M, shooter.pid)] ?? 1), .06, .65);
       if (R() < pg) {
         goal(M, t, shooter, true, false);
         mom = (t === 0 ? 1 : -1);
       } else {
-        bump(shooter, 0.12);
-        if (gkD) { bump(gkD, 0.28); gkD.saves++; M.stats[o].saves++; }
+        bump(shooter, 0.12); defCredit(M, D, 0.05);
+        if (gkD) { bump(gkD, 0.2); gkD.saves++; M.stats[o].saves++; }
         if (R() < 0.35) M.stats[t].corners++;
       }
     } else {
-      bump(shooter, -0.04);
+      bump(shooter, -0.04); defCredit(M, D, 0.08);
       if (R() < 0.2) M.stats[t].corners++;
     }
   }
@@ -624,6 +624,8 @@ function injure(M, p) {
     }
   }
 }
+// una defensa se lleva mérito cuando la ocasión rival no termina en gol (bloqueo, marca, despeje)
+function defCredit(M, D, v) { const defs = D.filter(p => slotOf(M, p.pid) === 'DEF'); if (defs.length) bump(defs[Math.floor(R() * defs.length)], v); }
 function slotOf(M, pid) { const p = M.players[pid]; const f = M.teams[p.team].field.find(x => x.pid === pid); return f ? f.slot : 'MC'; }
 
 function goal(M, t, shooter, withAssist, isPen) {
@@ -636,7 +638,7 @@ function goal(M, t, shooter, withAssist, isPen) {
   for (const p of onField(M, t)) if (p !== shooter && p !== assist) bump(p, 0.05);
   for (const p of onField(M, 1 - t)) {
     const s = slotOf(M, p.pid);
-    bump(p, s === 'POR' ? -0.35 : s === 'DEF' ? -0.15 : -0.05);
+    bump(p, s === 'POR' ? -0.35 : s === 'DEF' ? -0.12 : -0.05);
   }
   ev(M, { type: isPen ? 'penGoal' : 'goal', team: t, pid: shooter.pid, pid2: assist ? assist.pid : null, score: M.score.slice() });
 }
@@ -778,6 +780,11 @@ function shootoutKick(M) {
 function finish(M) {
   M.done = true; M.phase = 'ft';
   for (const t of [0, 1]) for (const p of onField(M, t)) p.minOut = M.minute;
+  // valla invicta: premio a portera y defensas que terminaron en cancha
+  for (const t of [0, 1]) {
+    const conc = M.score[1 - t];
+    for (const p of onField(M, t)) { const sl = slotOf(M, p.pid); if (sl === 'POR') bump(p, conc === 0 ? 0.3 : conc === 1 ? 0.05 : 0); if (sl === 'DEF') bump(p, conc === 0 ? 0.5 : conc === 1 ? 0.15 : 0); }
+  }
   ev(M, { type: 'ft' });
 }
 
@@ -1014,24 +1021,47 @@ function sampleData() {
 function roundRobin(ids) {
   const arr = ids.slice(); if (arr.length % 2) arr.push(null);
   const n = arr.length; const rounds = [];
+  const home = {}, last = {}; ids.forEach(id => { home[id] = 0; last[id] = null; });
   for (let r = 0; r < n - 1; r++) {
     const pairs = []; let bye = null;
     for (let i = 0; i < n / 2; i++) {
       const a = arr[i], b = arr[n - 1 - i];
       if (!a || !b) { bye = a || b; continue; }
-      pairs.push((i === 0 ? r % 2 === 0 : (i + r) % 2 === 0) ? [a, b] : [b, a]);
+      // local: quien lleva menos partidos en casa; si empatan, quien jugó de visita la fecha anterior
+      let h;
+      if (home[a] !== home[b]) h = home[a] < home[b] ? a : b;
+      else if (last[a] !== last[b]) h = last[a] === 'A' ? a : last[b] === 'A' ? b : (Math.random() < .5 ? a : b);
+      else h = Math.random() < .5 ? a : b;
+      const aw = h === a ? b : a;
+      home[h]++; last[h] = 'H'; last[aw] = 'A';
+      pairs.push([h, aw]);
     }
     rounds.push({ pairs, bye });
     arr.splice(1, 0, arr.pop());
   }
   return rounds;
 }
+/* Equilibra partidos de local en la fase regular: da vuelta partidos pendientes si una tiene 2+ localías más que su rival */
+function balanceHome(fixtures) {
+  const c = {}; fixtures.filter(f => f.stage === 'L').forEach(f => { c[f.home] = (c[f.home] || 0) + 1; c[f.away] = c[f.away] || 0; });
+  let changed = true, guard = 0;
+  while (changed && guard++ < 500) {
+    changed = false;
+    for (const f of fixtures) {
+      if (f.stage !== 'L' || f.res) continue;
+      if (c[f.home] - c[f.away] >= 2) { c[f.home]--; c[f.away]++; const t = f.home; f.home = f.away; f.away = t; changed = true; }
+    }
+  }
+}
+// Sin ventaja de local: la final y la fase regular (una sola vuelta) de las ligas con play-offs
+function isNeutral(lg, f) { return f.stage === 'F' || (lg.type === 'po' && f.stage === 'L'); }
 function genFixtures(teamIds, type) {
   const ids = teamIds.slice().sort(() => Math.random() - .5);
   const rr = roundRobin(ids);
   const fixtures = []; const byes = {};
   rr.forEach((rd, i) => { rd.pairs.forEach(([h, a]) => fixtures.push({ id: uid(), stage: 'L', round: i + 1, home: h, away: a, res: null })); if (rd.bye) byes[i + 1] = rd.bye; });
   if (type === 'dbl') rr.forEach((rd, i) => { const r = rr.length + i + 1; rd.pairs.forEach(([h, a]) => fixtures.push({ id: uid(), stage: 'L', round: r, home: a, away: h, res: null })); if (rd.bye) byes[r] = rd.bye; });
+  if (type !== 'dbl') balanceHome(fixtures);
   const draw = {}; teamIds.forEach(id => { draw[id] = Math.random(); });
   return { fixtures, byes, draw };
 }
@@ -1039,7 +1069,7 @@ function createLeague(name, type, teamIds) {
   const g = genFixtures(teamIds, type);
   return { id: uid(), name, type, teams: teamIds.slice(), fixtures: g.fixtures, byes: g.byes, draw: g.draw, createdAt: Date.now(), champion: null, season: 1, history: [], out: {} };
 }
-function migrateLeague(lg) { if (!lg.season) lg.season = 1; if (!lg.history) lg.history = []; if (!lg.out) lg.out = {}; (lg.fixtures || []).forEach(f => f.res && f.res.lines.forEach(l => { l.pos = normPos(l.pos); })); }
+function migrateLeague(lg) { if (lg.type === 'po' && !lg.hbal) { balanceHome(lg.fixtures || []); lg.hbal = 1; } if (!lg.season) lg.season = 1; if (!lg.history) lg.history = []; if (!lg.out) lg.out = {}; (lg.fixtures || []).forEach(f => f.res && f.res.lines.forEach(l => { l.pos = normPos(l.pos); })); }
 function migrateTeams() { DATA.teams.forEach(t => t.players.forEach(p => { p.pos = normPos(p.pos); })); }
 function teamSnap(id) { const t = teamById(id); return t ? { id, name: t.name, abbr: t.abbr, logo: t.logo } : { id, name: '—', abbr: '—' }; }
 function runnerUpId(lg) {
@@ -1603,7 +1633,7 @@ SCREENS.settings = {
       <div class="sec-t"><h2>Instalar en Android</h2></div>
       <div class="card" style="padding:14px;font-size:14px;line-height:1.5"><ol style="margin:0;padding-left:20px;display:flex;flex-direction:column;gap:6px">
         <li>Abre la app en <b>Chrome</b>.</li><li>Toca el menú <b>⋮</b> y elige <b>Instalar app</b> (o <b>Añadir a pantalla de inicio</b>).</li><li>Se abrirá desde su ícono, a pantalla completa y sin internet.</li></ol></div>
-      <p class="muted" style="text-align:center;font-size:12px;margin:4px 0 0">Cancha 7 · v1.5</p>
+      <p class="muted" style="text-align:center;font-size:12px;margin:4px 0 0">Cancha 7 · v1.7</p>
     </main>${tabbar('settings')}`;
   },
   after() {
@@ -1695,7 +1725,7 @@ SCREENS.prematch = {
     const pitchLines = `<svg class="lines" viewBox="0 0 100 120" preserveAspectRatio="none" fill="none" stroke="rgba(255,255,255,.5)" stroke-width=".6"><rect x="3" y="3" width="94" height="114"/><line x1="3" y1="60" x2="97" y2="60"/><circle cx="50" cy="60" r="11"/><rect x="26" y="3" width="48" height="17"/><rect x="26" y="100" width="48" height="17"/><rect x="40" y="0.5" width="20" height="2.5"/><rect x="40" y="117" width="20" height="2.5"/></svg>`;
     return `${topbar(stageLabel(f, lg))}<main class="content notab">
       <div class="vs card duel" style="padding:16px 8px;--hc:${teamColors(T[0], T[1])[0]};--ac:${teamColors(T[0], T[1])[1]}"><div class="side">${crestSVG(T[0], 56)}<b>${esc(T[0].name)}</b></div><div class="mid">VS</div><div class="side">${crestSVG(T[1], 56)}<b>${esc(T[1].name)}</b></div></div>
-      <div class="seg">${T.map((t, i) => `<button class="${side === i ? 'on' : ''}" data-side="${i}">${esc(t.abbr)}${i === 0 && f.stage !== 'F' ? ' · Local' : ''}</button>`).join('')}</div>
+      <div class="seg">${T.map((t, i) => `<button class="${side === i ? 'on' : ''}" data-side="${i}">${esc(t.abbr)}${i === 0 && !isNeutral(lg, f) ? ' · Local' : ''}</button>`).join('')}</div>
       <div style="display:flex;gap:6px;align-items:center">${Object.keys(FORMATIONS).map(k => `<button class="btn sm ${L.formation === k ? 'blue' : 'ghost'}" style="flex:1;padding:0 4px;font-size:15px" data-form="${k}">${k}</button>`).join('')}<button class="btn sm ghost" id="autoL" style="padding:0 8px" aria-label="Alineación automática">${IC.wand.replace('<svg', '<svg width="20" height="20"')}</button></div>
       ${(() => { const fm = FORM_MOD[L.formation]; const rivalF = p.lineups[1 - side].formation; const beats = FORM_BEATS[L.formation]; const loses = Object.keys(FORM_BEATS).find(k => FORM_BEATS[k] === L.formation);
         const st = beats === rivalF ? '<span class="chip" style="background:rgba(53,208,127,.15);color:var(--good)">Ventaja táctica</span>' : FORM_BEATS[rivalF] === L.formation ? '<span class="chip" style="background:rgba(255,77,94,.15);color:var(--rc)">Desventaja táctica</span>' : '';
@@ -1736,7 +1766,7 @@ SCREENS.prematch = {
     $('#kick').onclick = () => {
       const snapTeams = T.map(t => ({ id: t.id, name: t.name, abbr: t.abbr, skill: t.skill, players: t.players.map(pl => Object.assign({}, pl)) }));
       [0, 1].forEach(k => saveLineup(lg, T[k], p.lineups[k], p.repl[k])); save();
-      const M = createMatch(snapTeams[0], snapTeams[1], p.lineups, { knockout: f.stage === 'F', neutral: f.stage === 'F' });
+      const M = createMatch(snapTeams[0], snapTeams[1], p.lineups, { knockout: f.stage === 'F', neutral: isNeutral(lg, f) });
       LIVE = { M, lg: lg.id, fx: f.id, speed: 1, timer: null, saved: false };
       p._scroll = 0;
       replace('match', { lg: lg.id, fx: f.id });
