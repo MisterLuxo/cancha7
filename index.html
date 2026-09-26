@@ -884,7 +884,7 @@ function step(M) {
   return M._new;
 }
 /* ===== Arenga de la capitana ===== */
-const BOOST = { att: 1.15, mid: 1.08, def: 1.08 }; // +8% general, +15% en ataque
+const BOOST = { att: 1.20, mid: 1.10, def: 1.10 }; // +10% general, +20% en ataque
 const BOOST_MIN = 10;
 function boostTick(M) {
   for (const t of [0, 1]) {
@@ -2011,7 +2011,7 @@ SCREENS.settings = {
       <div class="sec-t"><h2>Instalar en Android</h2></div>
       <div class="card" style="padding:14px;font-size:14px;line-height:1.5"><ol style="margin:0;padding-left:20px;display:flex;flex-direction:column;gap:6px">
         <li>Abre la app en <b>Chrome</b>.</li><li>Toca el menú <b>⋮</b> y elige <b>Instalar app</b> (o <b>Añadir a pantalla de inicio</b>).</li><li>Se abrirá desde su ícono, a pantalla completa y sin internet.</li></ol></div>
-      <p class="muted" style="text-align:center;font-size:12px;margin:4px 0 0">Cancha 7 · v2.1.1</p>
+      <p class="muted" style="text-align:center;font-size:12px;margin:4px 0 0">Cancha 7 · v2.1.2</p>
     </main>${tabbar('settings')}`;
   },
   after() {
