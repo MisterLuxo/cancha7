@@ -1842,7 +1842,7 @@ SCREENS.settings = {
       <div class="sec-t"><h2>Instalar en Android</h2></div>
       <div class="card" style="padding:14px;font-size:14px;line-height:1.5"><ol style="margin:0;padding-left:20px;display:flex;flex-direction:column;gap:6px">
         <li>Abre la app en <b>Chrome</b>.</li><li>Toca el menú <b>⋮</b> y elige <b>Instalar app</b> (o <b>Añadir a pantalla de inicio</b>).</li><li>Se abrirá desde su ícono, a pantalla completa y sin internet.</li></ol></div>
-      <p class="muted" style="text-align:center;font-size:12px;margin:4px 0 0">Cancha 7 · v1.9</p>
+      <p class="muted" style="text-align:center;font-size:12px;margin:4px 0 0">Cancha 7 · v1.9.1</p>
     </main>${tabbar('settings')}`;
   },
   after() {
@@ -2047,7 +2047,7 @@ SCREENS.match = {
     const T = [teamById(f.home), teamById(f.away)]; LIVE.T = T; LIVE.cols = teamColors(T[0], T[1]);
     const M = LIVE.M;
     return `<div class="match"><div class="sb duel" style="--hc:${LIVE.cols[0]};--ac:${LIVE.cols[1]}">
-      <div class="sb-top"><button class="iconbtn" data-act="back" aria-label="Salir">${IC.back}</button><span class="muted up" style="font-size:12px;font-weight:700">${esc(stageLabel(f, lg))}</span><button class="speed ${LIVE.speed === 2 ? 'on' : ''}" id="spd" aria-pressed="${LIVE.speed === 2}">x2</button></div>
+      <div class="sb-top"><button class="iconbtn" data-act="back" aria-label="Salir">${IC.back}</button><span class="muted up" style="font-size:12px;font-weight:700">${esc(stageLabel(f, lg))}</span><div style="display:flex;gap:6px">${[2, 3].map(n => `<button class="speed ${LIVE.speed === n ? 'on' : ''}" data-spd="${n}" aria-pressed="${LIVE.speed === n}">x${n}</button>`).join('')}</div></div>
       <div class="sb-grid"><div class="sb-team">${crestSVG(T[0], 58)}<b>${esc(T[0].name)}</b></div>
         <div class="sb-score"><div class="sc"><span id="s0">${M.score[0]}</span><i>-</i><span id="s1">${M.score[1]}</span></div><span class="clock" id="clk"><span class="dot"></span><span id="clkT">${clockLabel(M)}</span></span><span class="pens-sub" id="pensSub"></span></div>
         <div class="sb-team">${crestSVG(T[1], 58)}<b>${esc(T[1].name)}</b></div></div>
@@ -2072,7 +2072,11 @@ SCREENS.match = {
       confirmSheet('¿Salir del partido?', 'El partido está en juego. Si sales, no se guardará el resultado.', 'Salir', () => { NAV.guard = null; LIVE = null; popRoute(); });
       setTimeout(() => { const s = $('#sheet'); if (!s) return; $('#cNo', s).onclick = () => { closeSheet(); if (was !== null) loop(); }; s.onclick = e => { if (e.target === s) { closeSheet(); loop(); } }; }, 0);
     };
-    $('#spd').onclick = e => { LIVE.speed = LIVE.speed === 2 ? 1 : 2; e.currentTarget.classList.toggle('on', LIVE.speed === 2); e.currentTarget.setAttribute('aria-pressed', LIVE.speed === 2); if (LIVE.timer) { clearTimeout(LIVE.timer); LIVE.timer = setTimeout(tick, 300); } };
+    app().querySelectorAll('[data-spd]').forEach(btn => btn.onclick = () => {
+      const n = +btn.dataset.spd; LIVE.speed = LIVE.speed === n ? 1 : n;
+      app().querySelectorAll('[data-spd]').forEach(x => { const on = +x.dataset.spd === LIVE.speed; x.classList.toggle('on', on); x.setAttribute('aria-pressed', on); });
+      if (LIVE.timer) { clearTimeout(LIVE.timer); LIVE.timer = setTimeout(tick, 300); }
+    });
     $('#toLg').onclick = () => back();
     $('#toSum').onclick = () => replace('summary', { lg: p.lg, fx: p.fx, tab: 'ev' });
     try { navigator.wakeLock && navigator.wakeLock.request('screen').then(w => { wakeLock = w; }).catch(() => { }); } catch (e) { }
