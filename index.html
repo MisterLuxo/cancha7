@@ -458,6 +458,12 @@ body{background:radial-gradient(900px 420px at 10% -140px,rgba(255,122,26,.20),t
 .boostflash .bf small{font:700 14px/1 var(--body);letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.8)}
 .boostflash .av{box-shadow:0 0 0 4px var(--gold),0 0 40px rgba(255,201,64,.7)}
 .goalflash.boostflash{background:radial-gradient(circle at 50% 45%,rgba(255,201,64,.32) 0,rgba(8,12,17,.95) 68%)}
+/* v2.1.1: aviso de arenga sin cursiva */
+.goalflash.boostflash .bf{animation:bfz 2.6s ease forwards;transform:none;font-style:normal}
+.goalflash.boostflash .bf b{transform:none;font-style:normal}
+.goalflash.boostflash .bf q{font-style:normal}
+@keyframes bfz{0%{transform:scale(.4);opacity:0}20%{transform:scale(1.06);opacity:1}35%{transform:scale(1)}100%{transform:scale(1.02)}}
+.goalflash.boostflash .bf q{letter-spacing:0;font-weight:600}
 
 </style>
 </head><body><div id="app"></div>
@@ -2005,7 +2011,7 @@ SCREENS.settings = {
       <div class="sec-t"><h2>Instalar en Android</h2></div>
       <div class="card" style="padding:14px;font-size:14px;line-height:1.5"><ol style="margin:0;padding-left:20px;display:flex;flex-direction:column;gap:6px">
         <li>Abre la app en <b>Chrome</b>.</li><li>Toca el menú <b>⋮</b> y elige <b>Instalar app</b> (o <b>Añadir a pantalla de inicio</b>).</li><li>Se abrirá desde su ícono, a pantalla completa y sin internet.</li></ol></div>
-      <p class="muted" style="text-align:center;font-size:12px;margin:4px 0 0">Cancha 7 · v2.1</p>
+      <p class="muted" style="text-align:center;font-size:12px;margin:4px 0 0">Cancha 7 · v2.1.1</p>
     </main>${tabbar('settings')}`;
   },
   after() {
