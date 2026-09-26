@@ -638,7 +638,7 @@ function playMinute(M) {
     const fouler = pick(D, p => W_FOUL[slotOf(M, p.pid)] ?? 1);
     M.stats[o].fouls++; bump(fouler, -0.05);
     const isPen = R() < 0.035;
-    card(M, fouler, isPen ? 0.3 : 0.13);
+    card(M, fouler, isPen ? 0.3 : 0.13, isPen ? 0.018 : 0.009);
     if (isPen && A.length) { penalty(M, t, o); mom = (t === 0 ? 1 : -1) * 0.9; }
   } else if (R() < pChance && A.length) {
     // Ocasión
@@ -744,8 +744,8 @@ function penalty(M, t, o) {
     ev(M, { type: 'penMiss', team: t, pid: taker.pid, pid2: saved ? gk.pid : null, saved });
   }
 }
-function card(M, p, pY) {
-  if (R() < 0.009) { sendOff(M, p, 'red'); return; }
+function card(M, p, pY, pR = 0.009) {
+  if (R() < pR) { sendOff(M, p, 'red'); return; }
   if (R() < pY) giveYellow(M, p);
 }
 function giveYellow(M, p) {
@@ -1940,7 +1940,7 @@ SCREENS.settings = {
       <div class="sec-t"><h2>Instalar en Android</h2></div>
       <div class="card" style="padding:14px;font-size:14px;line-height:1.5"><ol style="margin:0;padding-left:20px;display:flex;flex-direction:column;gap:6px">
         <li>Abre la app en <b>Chrome</b>.</li><li>Toca el menú <b>⋮</b> y elige <b>Instalar app</b> (o <b>Añadir a pantalla de inicio</b>).</li><li>Se abrirá desde su ícono, a pantalla completa y sin internet.</li></ol></div>
-      <p class="muted" style="text-align:center;font-size:12px;margin:4px 0 0">Cancha 7 · v2.0.1</p>
+      <p class="muted" style="text-align:center;font-size:12px;margin:4px 0 0">Cancha 7 · v2.0.2</p>
     </main>${tabbar('settings')}`;
   },
   after() {
