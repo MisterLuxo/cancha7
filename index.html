@@ -423,6 +423,23 @@ body{background:radial-gradient(900px 420px at 10% -140px,rgba(255,122,26,.20),t
 .ps-tbl em{font-style:normal;font-size:10px;color:var(--accent);font-weight:600}
 .ps-tbl .rt{height:22px;min-width:34px;font-size:14px}
 
+/* v2.0.1: progreso con texto y datos del equipo */
+.progrow{display:flex;align-items:center;gap:12px}
+.progrow .prog{flex:1;height:8px;border-radius:4px}
+.progtxt{flex:none;font-size:13px;color:var(--muted);white-space:nowrap}
+.progtxt b{font:800 18px/1 var(--disp);color:var(--text)}
+.progtxt small{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--faint)}
+.tmeta{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:4px}
+.tabbr{font:700 13px/1 var(--disp);letter-spacing:.08em;color:var(--muted)}
+.tchip{display:inline-flex;align-items:center;gap:4px;padding:3px 7px;border-radius:7px;background:rgba(255,255,255,.07);font-size:12px;color:var(--muted);line-height:1.1}
+.tchip b{color:var(--text);font-weight:700}
+.tchip.gold{background:rgba(255,201,64,.14);color:var(--gold)}
+.tchip.gold b{color:var(--gold)}
+.tchip.warn{background:rgba(242,104,61,.16);color:var(--bad);font-weight:700}
+.tmedia{flex:none;width:54px;height:54px;border-radius:14px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;background:color-mix(in srgb,var(--mc) 16%,transparent);border:1.5px solid color-mix(in srgb,var(--mc) 55%,transparent)}
+.tmedia b{font:800 23px/1 var(--disp);color:var(--mc)}
+.tmedia small{font:700 9px/1 var(--body);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+
 </style>
 </head><body><div id="app"></div>
 <script>
@@ -1513,7 +1530,7 @@ SCREENS.leagues = {
       const band = `<span class="lg-band" style="background:linear-gradient(90deg,${cs.map((c, i) => `${c} ${(i * w).toFixed(1)}% ${((i + 1) * w).toFixed(1)}%`).join(',')})"></span>`;
       return `<button class="card lg-card" data-lg="${lg.id}">${band}<div class="hd"><h3>${esc(lg.name)}</h3><span class="chip ${lg.type === 'po' ? 'blue' : lg.type === 'md' ? 'gold' : 'acc'}">${typeLabel(lg.type)}</span></div>
         <div class="crest-strip">${lg.teams.slice(0, 12).map(id => crestSVG(teamById(id), 28)).join('')}${lg.teams.length > 12 ? `<span class="muted" style="align-self:center;margin-left:8px;font-weight:700">+${lg.teams.length - 12}</span>` : ''}${isMD(lg) ? `<span class="muted" style="align-self:center;margin-left:10px;font-size:13px">${lg.divs.length} divisiones</span>` : ''}</div>
-        <div class="prog"><i style="width:${Math.round(100 * done / Math.max(1, tot))}%"></i></div>${status}</button>`;
+        <div class="progrow"><div class="prog"><i style="width:${Math.round(100 * done / Math.max(1, tot))}%"></i></div><span class="progtxt num"><b>${done}</b>/${tot} <small>partidos</small></span></div>${status}</button>`;
     }).join('');
     const noTeams = DATA.teams.length < 2;
     return `${topbar('', { back: false, brand: true })}<main class="content">${sampleBanner()}
@@ -1775,9 +1792,20 @@ SCREENS.history = {
 };
 
 /* ---------- EQUIPOS ---------- */
+// media de las 7 titulares de la alineación automática (con la penalización por posición)
+function teamMedia(t) {
+  const L = t.players.length ? autoLineup(t) : null; if (!L) return 0;
+  const v = L.field.map(f => { const p = t.players.find(x => x.id === f.pid); return p ? effSkill(p, f.slot) : null; }).filter(x => x !== null);
+  return v.length ? Math.round(v.reduce((a, b) => a + b, 0) / v.length) : 0;
+}
+function teamTitles(id) { return DATA.leagues.reduce((a, lg) => a + (lg.history || []).filter(h => h.champion && h.champion.id === id).length, 0); }
 SCREENS.teams = {
   html() {
-    const rows = DATA.teams.map(t => `<button class="row trow" style="--c1:${lum(t.logo.c1) < .22 ? t.logo.c2 : t.logo.c1}" data-team="${t.id}">${crestSVG(t, 46)}<div class="grow"><div class="t1">${esc(t.name)}</div><div class="t2">${esc(t.abbr)} · ${t.players.length}/9 jugadoras · Sinergia ${t.skill}</div></div>${IC.chev}</button>`).join('');
+    const rows = DATA.teams.map(t => {
+      const m = teamMedia(t), tt = teamTitles(t.id);
+      const inc = t.players.length < 9 ? `<span class="tchip warn">${t.players.length}/9</span>` : '';
+      return `<button class="row trow" style="--c1:${lum(t.logo.c1) < .22 ? t.logo.c2 : t.logo.c1}" data-team="${t.id}">${crestSVG(t, 46)}<div class="grow"><div class="t1">${esc(t.name)}</div><div class="tmeta"><span class="tabbr">${esc(t.abbr)}</span><span class="tchip">Sinergia <b>${t.skill}</b></span>${tt ? `<span class="tchip gold">${IC.trophy.replace('<svg', '<svg width="12" height="12"')}<b>${tt}</b></span>` : ''}${inc}</div></div>${m ? `<div class="tmedia" style="--mc:${skillColor(m)}"><b class="num">${m}</b><small>Media</small></div>` : ''}</button>`;
+    }).join('');
     return `${topbar('Equipos', { back: false })}<main class="content">${sampleBanner()}
       ${rows ? `<div class="card list">${rows}</div>` : `<div class="card empty">${IC.shield.replace('<svg', '<svg width="44" height="44" style="color:var(--accent)"')}<p>Crea tu primer equipo: nombre, escudo y sus 9 jugadoras.</p><button class="btn pri" data-newteam>Nuevo equipo</button></div>`}
     </main>${rows ? `<button class="btn pri fab" data-newteam>${IC.plus.replace('<svg', '<svg width="20" height="20"')} Nuevo equipo</button>` : ''}${tabbar('teams')}`;
@@ -1912,7 +1940,7 @@ SCREENS.settings = {
       <div class="sec-t"><h2>Instalar en Android</h2></div>
       <div class="card" style="padding:14px;font-size:14px;line-height:1.5"><ol style="margin:0;padding-left:20px;display:flex;flex-direction:column;gap:6px">
         <li>Abre la app en <b>Chrome</b>.</li><li>Toca el menú <b>⋮</b> y elige <b>Instalar app</b> (o <b>Añadir a pantalla de inicio</b>).</li><li>Se abrirá desde su ícono, a pantalla completa y sin internet.</li></ol></div>
-      <p class="muted" style="text-align:center;font-size:12px;margin:4px 0 0">Cancha 7 · v2.0</p>
+      <p class="muted" style="text-align:center;font-size:12px;margin:4px 0 0">Cancha 7 · v2.0.1</p>
     </main>${tabbar('settings')}`;
   },
   after() {
