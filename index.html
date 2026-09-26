@@ -465,6 +465,30 @@ body{background:radial-gradient(900px 420px at 10% -140px,rgba(255,122,26,.20),t
 @keyframes bfz{0%{transform:scale(.4);opacity:0}20%{transform:scale(1.06);opacity:1}35%{transform:scale(1)}100%{transform:scale(1.02)}}
 .goalflash.boostflash .bf q{letter-spacing:0;font-weight:600}
 
+/* v2.2: tablas de temporadas pasadas */
+.hcard{cursor:pointer}
+.hhead{display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid var(--line);background:linear-gradient(90deg,rgba(255,201,64,.10),transparent 70%)}
+.hcard:active .hhead{background:linear-gradient(90deg,rgba(255,201,64,.2),transparent 80%)}
+.hnum{font-size:34px;font-weight:800;color:var(--gold);line-height:1;padding:4px 8px;border-radius:10px;background:rgba(255,201,64,.12);border:1px solid rgba(255,201,64,.35)}
+.hsee{display:flex;align-items:center;gap:2px;font:700 12px/1 var(--body);letter-spacing:.06em;text-transform:uppercase;color:var(--gold);white-space:nowrap}
+.st-hero{display:flex;align-items:center;gap:14px;padding:16px;border-radius:16px;background:radial-gradient(300px 140px at 0% 0%,rgba(255,201,64,.22),transparent 70%),var(--surface);border:1px solid rgba(255,201,64,.35);box-shadow:0 10px 28px rgba(0,0,0,.3)}
+.st-num{font-size:56px;font-weight:800;line-height:1;color:var(--gold);text-shadow:0 0 24px rgba(255,201,64,.35)}
+.st-champ{display:flex;align-items:center;gap:10px;margin-top:8px}
+.st-champ small{display:block;font:700 11px/1 var(--body);letter-spacing:.1em;text-transform:uppercase;color:var(--gold)}
+.st-champ b{font:800 20px/1.1 var(--disp);text-transform:uppercase}
+.st-card{background:var(--surface);border:1px solid var(--line);border-radius:14px;overflow:hidden;box-shadow:0 10px 28px rgba(0,0,0,.28)}
+.st-hd{display:flex;align-items:baseline;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:12px 14px;border-bottom:1px solid var(--line);background:linear-gradient(180deg,#1C2A38,#16222E)}
+.st-hd b{font-size:20px;letter-spacing:.04em;text-transform:uppercase}
+.st-hd span{font-size:13px;color:var(--muted)}
+.st-hd em{font-style:normal;font-weight:700}
+.st-tbl tbody tr{animation:strow .45s ease both}
+@keyframes strow{from{opacity:0;transform:translateX(-10px)}}
+.st-leg{border:0;padding:0 2px}
+.st-tbl{font-size:14px}
+.st-tbl th,.st-tbl td{padding-left:3px;padding-right:3px}
+.st-tbl td.tm span{max-width:22vw}
+.st-tbl td.tm div{gap:6px}
+
 </style>
 </head><body><div id="app"></div>
 <script>
@@ -1844,7 +1868,7 @@ SCREENS.history = {
     const cards = H.map(h => {
       const sc = h.scorers || [];
       const scT = sc[0] ? teamById(sc[0].team.id) || sc[0].team : null;
-      return `<div class="card" style="overflow:hidden"><div style="display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid var(--line)"><span class="disp" style="font-size:34px;font-weight:800;color:var(--gold);line-height:1">#${h.n}</span><div style="flex:1"><div style="font-weight:700">Temporada #${h.n}</div><div class="muted" style="font-size:13px">${typeLabel(h.type)} · ${new Date(h.finishedAt).toLocaleDateString('es')}</div></div></div>
+      return `<div class="card hcard" style="overflow:hidden" data-season="${h.n}" role="button"><div class="hhead"><span class="hnum disp">#${h.n}</span><div style="flex:1"><div style="font-weight:700">Temporada #${h.n}</div><div class="muted" style="font-size:13px">${typeLabel(h.type)} · ${new Date(h.finishedAt).toLocaleDateString('es')}</div></div>${h.table || h.divs ? `<span class="hsee">Ver tablas ${IC.chev.replace('class="chev"', 'class="chev" style="color:var(--gold)"')}</span>` : ''}</div>
         <div class="list">
           <div class="row" style="min-height:54px">${crestOf(h.champion)}<div class="grow"><div class="t2 up" style="font-size:11px;font-weight:700;color:var(--gold)">Campeón</div><div class="t1">${nameOf(h.champion)}</div></div>${IC.crown.replace('<svg', '<svg width="20" height="20"')}</div>
           ${h.runnerUp ? `<div class="row" style="min-height:54px">${crestOf(h.runnerUp)}<div class="grow"><div class="t2 up" style="font-size:11px;font-weight:700;color:#C9D3DC">Subcampeón</div><div class="t1">${nameOf(h.runnerUp)}</div></div></div>` : ''}
@@ -1857,6 +1881,41 @@ SCREENS.history = {
       <div class="sec-t"><h2>Temporadas</h2><span class="muted num">${H.length}</span></div>
       ${current}${cards || (current ? '' : '')}${!H.length ? `<div class="card empty" style="padding:18px"><p>Cuando termine la primera temporada aparecerán aquí el campeón, el subcampeón y la máxima goleadora.</p></div>` : ''}
     </main>`;
+  },
+  after(p) {
+    app().querySelectorAll('[data-season]').forEach(c => c.onclick = () => { const lg = leagueById(p.id); const h = lg && lg.history.find(x => x.n === +c.dataset.season); if (!h || !(h.table || h.divs)) { toast('Esta temporada no tiene tablas guardadas'); return; } p._scroll = scrollY; go('season', { id: p.id, n: +c.dataset.season }); });
+  },
+};
+
+/* ---------- TABLAS FINALES DE UNA TEMPORADA ---------- */
+SCREENS.season = {
+  html(p) {
+    const lg = leagueById(p.id); const h = lg && lg.history.find(x => x.n === p.n);
+    if (!h) return `${topbar('Temporada')}<main class="content"><div class="card empty"><p>No se encontró esta temporada.</p></div></main>`;
+    const snapOf = id => { const t = teamById(id); if (t) return t; const all = [h.champion, h.runnerUp, ...(h.divs || []).flatMap(d => [d.champion, d.runnerUp, ...d.up, ...d.down])].filter(Boolean); return all.find(x => x.id === id) || { id, name: '—', abbr: '—' }; };
+    const tbl = (rows, zone, title, sub) => `<section class="st-card"><div class="st-hd"><b class="disp">${esc(title)}</b>${sub ? `<span>${sub}</span>` : ''}</div>
+      <div class="tblwrap"><table class="tbl st-tbl"><thead><tr><th>#</th><th style="text-align:left">Equipo</th><th>PJ</th><th>G</th><th>E</th><th>P</th><th>Goles</th><th>DG</th><th>Pts</th></tr></thead><tbody>${rows.map((r, i) => {
+        const T = snapOf(r.id); const z = zone(r.id, i);
+        return `<tr class="${z}" style="animation-delay:${Math.min(i, 14) * 45}ms"><td class="pos">${i + 1}</td><td class="tm"><div>${crestSVG(T, 24)}<span>${esc(T.name)}</span>${z === 'champ' ? IC.crown.replace('<svg', '<svg width="15" height="15" style="flex:none"') : ''}</div></td><td>${r.g + r.e + r.p}</td><td>${r.g}</td><td>${r.e}</td><td>${r.p}</td><td class="muted">${r.gf}:${r.gc}</td><td>${r.gf - r.gc > 0 ? '+' : ''}${r.gf - r.gc}</td><td class="pts">${r.pts}</td></tr>`;
+      }).join('')}</tbody></table></div></section>`;
+    let body = '';
+    if (h.divs) {
+      body = h.divs.map((d, i) => {
+        const up = new Set(d.up.map(x => x.id)), down = new Set(d.down.map(x => x.id));
+        const zone = (id, k) => (i === 0 && k === 0 ? 'champ' : up.has(id) ? 'zup' : down.has(id) ? 'zdown' : '');
+        const sub = [i === 0 ? '' : `Campeón: ${esc(snapOf(d.champion.id).name)}`, d.up.length ? `<em class="upc">▲ ${d.up.length}</em>` : '', d.down.length ? `<em class="downc">▼ ${d.down.length}</em>` : ''].filter(Boolean).join(' · ');
+        return tbl(d.table, zone, d.name, sub);
+      }).join('');
+    } else {
+      const zone = (id) => (h.champion && id === h.champion.id ? 'champ' : '');
+      body = tbl(h.table, zone, h.type === 'po' ? 'Fase regular' : 'Tabla final', h.type === 'po' ? 'El campeón se definió en los play-offs' : '');
+    }
+    const C = snapOf(h.champion.id);
+    const legend = `<div class="legend st-leg"><span><i style="background:var(--gold)"></i>Campeón</span>${h.divs ? '<span><i style="background:var(--good)"></i>Ascendió</span><span><i style="background:var(--rc)"></i>Descendió</span>' : ''}</div>`;
+    return `${topbar('Temporada #' + h.n)}<main class="content notab">
+      <div class="st-hero"><span class="st-num disp">#${h.n}</span><div style="flex:1;min-width:0"><div class="muted up" style="font-size:12px;font-weight:700">${esc(lg.name)} · ${typeLabel(h.type)}</div>
+        <div class="st-champ">${crestSVG(C, 36)}<div><small>Campeón</small><b>${esc(C.name)}</b></div></div></div></div>
+      ${legend}${body}</main>`;
   },
 };
 
@@ -2011,7 +2070,7 @@ SCREENS.settings = {
       <div class="sec-t"><h2>Instalar en Android</h2></div>
       <div class="card" style="padding:14px;font-size:14px;line-height:1.5"><ol style="margin:0;padding-left:20px;display:flex;flex-direction:column;gap:6px">
         <li>Abre la app en <b>Chrome</b>.</li><li>Toca el menú <b>⋮</b> y elige <b>Instalar app</b> (o <b>Añadir a pantalla de inicio</b>).</li><li>Se abrirá desde su ícono, a pantalla completa y sin internet.</li></ol></div>
-      <p class="muted" style="text-align:center;font-size:12px;margin:4px 0 0">Cancha 7 · v2.1.2</p>
+      <p class="muted" style="text-align:center;font-size:12px;margin:4px 0 0">Cancha 7 · v2.2</p>
     </main>${tabbar('settings')}`;
   },
   after() {
