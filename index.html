@@ -440,6 +440,25 @@ body{background:radial-gradient(900px 420px at 10% -140px,rgba(255,122,26,.20),t
 .tmedia b{font:800 23px/1 var(--disp);color:var(--mc)}
 .tmedia small{font:700 9px/1 var(--body);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
 
+/* v2.1: arenga de la capitana */
+.evt.boost{background:linear-gradient(90deg,rgba(255,201,64,.18),transparent 80%);border-radius:12px;padding-inline:6px;border:1px solid rgba(255,201,64,.35)}
+.evt.a.boost{background:linear-gradient(270deg,rgba(255,201,64,.18),transparent 80%)}
+.evt.boost .k{color:var(--gold)}
+.evt.boost .s{color:var(--text);font-style:italic}
+.evt.boost .av{box-shadow:0 0 0 2px var(--gold),0 0 14px rgba(255,201,64,.6)}
+.evt.boostend{min-height:44px;opacity:.85}
+.evt.boostend .k{font-size:14px;color:var(--gold)}
+.evt.boostend .p{font-size:12px;color:var(--muted);font-weight:500}
+.bchip{display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:999px;background:rgba(255,201,64,.18);border:1px solid rgba(255,201,64,.55);color:var(--gold);font:800 13px/1 var(--disp);letter-spacing:.06em;text-transform:uppercase;animation:bpulse 1.2s ease-in-out infinite}
+@keyframes bpulse{50%{box-shadow:0 0 12px rgba(255,201,64,.55)}}
+.boostflash{--gfc:rgba(255,201,64,.55);animation:gf 2.6s ease forwards}
+.boostflash .bf{display:flex;flex-direction:column;align-items:center;gap:8px;text-align:center;padding:0 24px;animation:gfz 2.6s ease forwards;transform:none}
+.boostflash .bf b{font:800 58px/1 var(--disp);color:var(--gold);letter-spacing:.03em;text-shadow:0 4px 24px rgba(0,0,0,.5);transform:skewX(-8deg)}
+.boostflash .bf q{font:600 20px/1.3 var(--body);color:#fff;max-width:30ch;font-style:italic}
+.boostflash .bf small{font:700 14px/1 var(--body);letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.8)}
+.boostflash .av{box-shadow:0 0 0 4px var(--gold),0 0 40px rgba(255,201,64,.7)}
+.goalflash.boostflash{background:radial-gradient(circle at 50% 45%,rgba(255,201,64,.32) 0,rgba(8,12,17,.95) 68%)}
+
 </style>
 </head><body><div id="app"></div>
 <script>
@@ -571,7 +590,8 @@ function teamStrength(M, t) {
   // inferioridad numérica: además de perder a la jugadora, el equipo se desordena un poco
   const down = Math.max(0, M.teams[1 - t].field.length - T.field.length);
   const nf = 1 - DOWN_PEN * down;
-  return { att: att * syn * fm.att * e.att * nf + 1, mid: mid * syn * fm.mid * e.mid * nf + 1, def: def * syn * fm.def * e.def * nf + 1, gk: gk * (0.9 + 0.2 * T.skill / 100), syn, chance: fm.chance };
+  const bo = T.boost ? BOOST : { att: 1, mid: 1, def: 1 };
+  return { att: att * syn * fm.att * e.att * nf * bo.att + 1, mid: mid * syn * fm.mid * e.mid * nf * bo.mid + 1, def: def * syn * fm.def * e.def * nf * bo.def + 1, gk: gk * (0.9 + 0.2 * T.skill / 100), syn, chance: fm.chance };
 }
 function effOf(M, pid) {
   const p = M.players[pid]; const T = M.teams[p.team];
@@ -591,11 +611,11 @@ function createMatch(home, away, lineups, opts = {}) {
     const L = lineups[t];
     M.teams.push({
       id: team.id, name: team.name, abbr: team.abbr, skill: team.skill || 50, formation: L.formation,
-      field: L.field.filter(f => f.pid).map(f => ({ pid: f.pid, slot: f.slot })), bench: L.bench.slice(), subsLeft: 2,
+      captain: team.captain || null, field: L.field.filter(f => f.pid).map(f => ({ pid: f.pid, slot: f.slot })), bench: L.bench.slice(), subsLeft: 2,
     });
     for (const p of team.players) {
       M.players[p.id] = {
-        pid: p.id, team: t, name: p.name, num: p.num, pos: p.pos, skill: p.skill, photo: p.photo || null,
+        pid: p.id, team: t, name: p.name, num: p.num, pos: p.pos, skill: p.skill, photo: p.photo || null, phrase: p.phrase || '',
         rating: 6.5, goals: 0, assists: 0, yc: 0, rc: 0, shots: 0, sot: 0, saves: 0, pens: 0,
         start: L.field.some(f => f.pid === p.id), minIn: L.field.some(f => f.pid === p.id) ? 0 : null, minOut: null, out: false,
       };
@@ -637,8 +657,8 @@ function playMinute(M) {
   if (R() < foulP && D.length) {
     const fouler = pick(D, p => W_FOUL[slotOf(M, p.pid)] ?? 1);
     M.stats[o].fouls++; bump(fouler, -0.05);
-    const isPen = R() < 0.035;
-    card(M, fouler, isPen ? 0.3 : 0.13, isPen ? 0.018 : 0.009);
+    const isPen = R() < 0.032;
+    card(M, fouler, isPen ? PEN_YELLOW : 0.13, isPen ? PEN_RED : 0.009);
     if (isPen && A.length) { penalty(M, t, o); mom = (t === 0 ? 1 : -1) * 0.9; }
   } else if (R() < pChance && A.length) {
     // Ocasión
@@ -716,6 +736,7 @@ function slotOf(M, pid) { const p = M.players[pid]; const f = M.teams[p.team].fi
 
 function goal(M, t, shooter, withAssist, isPen) {
   M.score[t]++; shooter.goals++; bump(shooter, isPen ? 0.8 : 1.1);
+  M._goalBy = t;
   let assist = null;
   if (withAssist && R() < 0.72) {
     const mates = onField(M, t).filter(p => p.pid !== shooter.pid);
@@ -782,6 +803,9 @@ function doSub(M, t, outP, inP, forceSlot) {
   outP.minOut = M.minute; outP.out = true; inP.minIn = M.minute; T.subsLeft--;
   ev(M, { type: 'sub', team: t, pid: inP.pid, pid2: outP.pid });
 }
+// tarjetas a quien comete un penal: 5% roja directa, 35% amarilla (0.368 del 95% restante), 60% sin tarjeta
+const PEN_RED = 0.05, PEN_YELLOW = 0.368;
+const CAP_MARGIN = 0.2; // décimas de nota que se le perdonan a la capitana al decidir un cambio
 function autoSubs(M) {
   for (const t of [0, 1]) {
     const T = M.teams[t];
@@ -796,11 +820,14 @@ function autoSubs(M) {
       const s = slotOf(M, p.pid);
       // una suplente que ya entró solo sale si lleva 20+ minutos jugando muy mal
       if (p.minIn > 0 && !(m - p.minIn >= 20 && p.rating < 5.8)) return false;
-      return s !== 'POR' || bench.some(b => b.pos === 'POR');
+      // la portera nunca sale por cambio (solo por lesión o expulsión)
+      return s !== 'POR';
     });
     if (!cands.length) continue;
-    const worst = cands.reduce((a, b) => (b.rating < a.rating ? b : a));
-    const urgent = M.period >= 2 && m >= 46 && worst.rating < 5.4 && gap;
+    // la capitana cuenta con un margen: es menos probable que sea la elegida para salir
+    const adj = p => p.rating + (p.pid === T.captain ? CAP_MARGIN : 0);
+    const worst = cands.reduce((a, b) => (adj(b) < adj(a) ? b : a));
+    const urgent = M.period >= 2 && m >= 46 && adj(worst) <= 5.5 && gap;
     const extra = M.period === 3 && m === 95;
     if (!(planned || urgent || extra)) continue;
     const slot = slotOf(M, worst.pid);
@@ -832,6 +859,7 @@ function step(M) {
   }
   if (M.minute >= end + M.added[M.period - 1]) {
     M._addAnnounced = false;
+    [0, 1].forEach(t => { if (M.teams[t].boost) endBoost(M, t, 'time'); });
     if (M.period === 1) { M.phase = 'ht'; ev(M, { type: 'ht' }); return M._new; }
     if (M.period === 3) { M.phase = 'etHt'; ev(M, { type: 'etHt' }); return M._new; }
     if (M.period === 2 || M.period === 4) {
@@ -843,9 +871,43 @@ function step(M) {
     }
   }
   M.minute++;
+  M._goalBy = null;
   playMinute(M);
   autoSubs(M);
+  boostTick(M);
   return M._new;
+}
+/* ===== Arenga de la capitana ===== */
+const BOOST = { att: 1.15, mid: 1.08, def: 1.08 }; // +8% general, +15% en ataque
+const BOOST_MIN = 10;
+function boostTick(M) {
+  for (const t of [0, 1]) {
+    const T = M.teams[t], o = M.teams[1 - t];
+    const cap = T.captain && T.field.some(f => f.pid === T.captain) ? M.players[T.captain] : null;
+    if (T.boost) {
+      if (M._goalBy === t) { endBoost(M, t, 'goal'); continue; }
+      if (!cap) { endBoost(M, t, 'out'); continue; }
+      if (M.minute >= T.boost.end) { endBoost(M, t, 'time'); continue; }
+      continue;
+    }
+    if (T.boostUsed || !cap) { T.condSince = null; continue; }
+    const diff = M.score[t] - M.score[1 - t];
+    const reason = T.field.length < o.field.length ? 'down' : diff < 0 ? 'comeback' : (diff === 1 && M.minute >= 60) ? 'seal' : null;
+    if (!reason) { T.condSince = null; continue; }
+    if (T.condSince == null) T.condSince = M.minute;
+    // la probabilidad parte baja cuando se cumple la condición y sube con cada minuto que pasa
+    const p = Math.min(0.12, 0.004 + 0.003 * (M.minute - T.condSince));
+    if (R() < p) {
+      T.boostUsed = true; T.boost = { start: M.minute, end: M.minute + BOOST_MIN, reason };
+      ev(M, { type: 'boost', team: t, pid: cap.pid, reason, phrase: cap.phrase || '', dur: BOOST_MIN });
+    }
+  }
+}
+function endBoost(M, t, why) {
+  const T = M.teams[t]; if (!T.boost) return;
+  T.boost = null;
+  if (why === 'goal' && T.captain && M.players[T.captain]) bump(M.players[T.captain], 0.3);
+  ev(M, { type: 'boostEnd', team: t, pid: T.captain, why });
 }
 function shootoutKick(M) {
   const so = M.shootout; const t = so.turn; const o = 1 - t;
@@ -986,6 +1048,7 @@ const IC = {
   hist: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 103-6.7L3 8"/><path d="M3 3v5h5M12 7v5l3 2"/></svg>',
   shirt: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M8 3l4 2 4-2 5 4-3 3-2-1v12H8V9L6 10 3 7z"/></svg>',
   boot: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"><path d="M4 6h5l1 5 8 2c2 .5 3 1.5 3 3v1H4z"/><path d="M4 20h17M9 17v3M14 17v3"/></svg>',
+  bolt: '<svg width="22" height="22" viewBox="0 0 24 24"><path d="M13 2L4 14h7l-1 8 9-12h-7z" fill="#FFC940" stroke="#8a5a00" stroke-width="1" stroke-linejoin="round"/></svg>',
   crown: '<svg viewBox="0 0 24 24" fill="var(--gold)"><path d="M3 18L2 7l5 4 5-7 5 7 5-4-1 11z"/></svg>',
 };
 
@@ -1890,6 +1953,7 @@ function playerSheet(p, pl, num) {
     <div class="photo-pick"><label style="cursor:pointer;position:relative" aria-label="Cambiar foto"><span id="phv">${avatar(w, 84, d, 'sq')}</span><span style="position:absolute;right:-6px;bottom:-6px;width:32px;height:32px;border-radius:50%;background:var(--accent);color:var(--accent-ink);display:grid;place-items:center">${IC.cam.replace('<svg', '<svg width="18" height="18"')}</span><input type="file" id="ph" accept="image/*" hidden></label>
     <div style="flex:1;font-size:13px" class="muted">Toca para elegir una foto. Se recorta en cuadrado (1:1). Si es PNG con fondo transparente, se mantiene transparente.${w.photo ? '<br><button id="rmph" style="color:var(--rc);font-weight:600;margin-top:6px">Quitar foto</button>' : ''}</div></div>
     <button class="capbtn ${d.captain === w.id ? 'on' : ''}" id="pcap" type="button"><span class="cc">C</span><div style="flex:1"><div style="font-weight:700">Capitana del equipo</div><div class="muted" style="font-size:13px">${d.captain && d.captain !== w.id ? 'Reemplaza a la capitana actual' : 'Lleva la C en su foto'}</div></div><span class="chk" style="${d.captain === w.id ? 'background:var(--gold);border-color:var(--gold)' : ''}"></span></button>
+    <div class="field"><label for="pf">Frase de arenga <span style="text-transform:none;letter-spacing:0;color:var(--faint)">(la dice cuando es capitana)</span></label><input class="inp" id="pf" maxlength="80" value="${esc(w.phrase || '')}" placeholder="Ej: ¡Nadie se rinde hoy!"></div>
     <div class="field"><label for="pn">Nombre y apellido</label><input class="inp" id="pn" maxlength="32" value="${esc(w.name)}" placeholder="Ej: Camila Soto"></div>
     <div class="grid2" style="grid-template-columns:96px 1fr"><div class="field"><label for="pd">Dorsal</label><input class="inp num" id="pd" type="number" inputmode="numeric" min="1" max="99" value="${w.num}"></div>
     <div class="field"><label for="pp">Posición</label><select class="inp" id="pp">${opts}</select></div></div>
@@ -1909,7 +1973,7 @@ function playerSheet(p, pl, num) {
     const c = $('#pc', bg); if (c) c.onclick = closeSheet;
     const dl = $('#pdel', bg); if (dl) dl.onclick = () => { if (d.captain === w.id) d.captain = null; d.players = d.players.filter(x => x.id !== w.id); p.dirty = true; closeSheet(); p._scroll = scrollY; render(); };
     $('#pok', bg).onclick = () => {
-      w.name = $('#pn', bg).value.trim(); w.num = clampN(parseInt($('#pd', bg).value) || 1, 1, 99); w.pos = $('#pp', bg).value;
+      w.phrase = $('#pf', bg).value.trim(); w.name = $('#pn', bg).value.trim(); w.num = clampN(parseInt($('#pd', bg).value) || 1, 1, 99); w.pos = $('#pp', bg).value;
       if (!w.name) { $('#perr', bg).textContent = 'Escribe el nombre de la jugadora.'; return; }
       if (d.players.some(x => x.id !== w.id && x.num === w.num)) { $('#perr', bg).textContent = `El dorsal ${w.num} ya lo usa otra jugadora.`; return; }
       const i = d.players.findIndex(x => x.id === w.id); if (i >= 0) d.players[i] = w; else d.players.push(w);
@@ -1925,6 +1989,7 @@ SCREENS.settings = {
     const s = DATA.settings;
     return `${topbar('Ajustes', { back: false })}<main class="content">
       <div class="card list">
+        <button class="row ${s.sound !== false ? 'on' : ''}" id="snd"><div class="grow"><div class="t1">Sonido de arenga</div><div class="t2">Suena cuando una capitana hace su arenga</div></div><span class="chk"></span></button>
         <button class="row ${s.vibrate ? 'on' : ''}" id="vib"><div class="grow"><div class="t1">Vibración en los goles</div><div class="t2">El teléfono vibra con cada gol</div></div><span class="chk"></span></button>
       </div>
       <div class="sec-t"><h2>Copia de seguridad</h2></div>
@@ -1940,11 +2005,12 @@ SCREENS.settings = {
       <div class="sec-t"><h2>Instalar en Android</h2></div>
       <div class="card" style="padding:14px;font-size:14px;line-height:1.5"><ol style="margin:0;padding-left:20px;display:flex;flex-direction:column;gap:6px">
         <li>Abre la app en <b>Chrome</b>.</li><li>Toca el menú <b>⋮</b> y elige <b>Instalar app</b> (o <b>Añadir a pantalla de inicio</b>).</li><li>Se abrirá desde su ícono, a pantalla completa y sin internet.</li></ol></div>
-      <p class="muted" style="text-align:center;font-size:12px;margin:4px 0 0">Cancha 7 · v2.0.2</p>
+      <p class="muted" style="text-align:center;font-size:12px;margin:4px 0 0">Cancha 7 · v2.1</p>
     </main>${tabbar('settings')}`;
   },
   after() {
     bindSampleBanner();
+    $('#snd').onclick = () => { DATA.settings.sound = DATA.settings.sound === false; save(); render(); };
     $('#vib').onclick = () => { DATA.settings.vibrate = !DATA.settings.vibrate; save(); render(); };
     if ($('#exp')) $('#exp').onclick = async () => {
       const blob = new Blob([JSON.stringify({ app: 'cancha7', v: 1, data: DATA, photos: PHOTOS })], { type: 'application/json' });
@@ -2113,7 +2179,7 @@ SCREENS.prematch = {
     app().querySelectorAll('[data-f]').forEach(b => b.onclick = () => tap('f', +b.dataset.f));
     app().querySelectorAll('[data-b]').forEach(b => b.onclick = () => tap('b', +b.dataset.b));
     $('#kick').onclick = () => {
-      const snapTeams = T.map(t => ({ id: t.id, name: t.name, abbr: t.abbr, skill: t.skill, players: t.players.map(pl => Object.assign({}, pl)) }));
+      const snapTeams = T.map(t => ({ id: t.id, name: t.name, abbr: t.abbr, skill: t.skill, captain: t.captain || null, players: t.players.map(pl => Object.assign({}, pl)) }));
       [0, 1].forEach(k => saveLineup(lg, T[k], p.lineups[k], p.repl[k])); save();
       const M = createMatch(snapTeams[0], snapTeams[1], p.lineups, { knockout: f.stage === 'F', neutral: isNeutral(lg, f) });
       LIVE = { M, lg: lg.id, fx: f.id, speed: 1, timer: null, saved: false };
@@ -2141,6 +2207,8 @@ function evHTML(e, info, T, cols) {
     case 'yellow': ic = IC.yc; k = 'Tarjeta amarilla'; break;
     case 'second': ic = IC.y2; k = 'Doble amarilla'; s = 'Expulsada'; break;
     case 'red': ic = IC.rc; k = 'Tarjeta roja'; s = 'Expulsada'; break;
+    case 'boost': { ic = IC.bolt; k = '¡Arenga de la capitana!'; cls = 'boost'; const why = { comeback: 'Para remontar', seal: 'Para sentenciar', down: 'Con una menos' }[e.reason] || ''; s = (e.phrase ? '“' + esc(e.phrase) + '”<br>' : '') + why + ' · ' + e.dur + ' min'; break; }
+    case 'boostEnd': ic = IC.bolt; cls = 'boostend'; k = e.why === 'goal' ? '¡Arenga cumplida!' : e.why === 'out' ? 'Arenga interrumpida' : 'Se acabó el impulso'; nm = e.why === 'goal' ? 'La capitana suma nota' : e.why === 'out' ? 'La capitana dejó la cancha' : 'Pasaron los 10 minutos'; break;
     case 'injury': ic = IC.inj; k = 'Lesión'; s = 'Baja: ' + e.games + (e.games === 1 ? ' partido' : ' partidos') + (p2 ? ' · Falta de ' + esc(p2.name) : ''); break;
     case 'sub': ic = IC.sub; k = 'Cambio'; nm = 'Entra: ' + esc(p.name); s = p2 ? 'Sale: ' + esc(p2.name) : ''; break;
     case 'soGoal': ic = IC.ball; k = 'Anota'; s = `Tanda ${e.so[0]}-${e.so[1]}`; break;
@@ -2149,7 +2217,7 @@ function evHTML(e, info, T, cols) {
   if (['goal', 'penGoal'].includes(e.type) && e.sc) s = (s ? s + ' · ' : '') + `${e.sc[0]}-${e.sc[1]}`;
   const side = e.team === 0 ? 'h' : 'a';
   const minute = ['soGoal', 'soMiss'].includes(e.type) ? 'PEN' : e.disp + "'";
-  const showAv = ['goal', 'penGoal', 'penMiss', 'sub', 'soGoal', 'soMiss', 'red', 'second', 'injury'].includes(e.type);
+  const showAv = ['goal', 'penGoal', 'penMiss', 'sub', 'soGoal', 'soMiss', 'red', 'second', 'injury', 'boost'].includes(e.type);
   return `<div class="evt ${side} ${cls}"><span class="m">${minute}</span><i class="tb" style="background:${cols ? cols[e.team] : 'var(--line)'}"></i><div class="box"><span class="ic">${ic}</span>${showAv ? avatar(p, 36, team) : ''}<div class="tx"><div class="k">${k}</div><div class="p">${nm}</div>${s ? `<div class="s">${s}</div>` : ''}</div></div></div>`;
 }
 function momHTML(vals, per, goals, cols, live) {
@@ -2188,9 +2256,9 @@ SCREENS.match = {
     const M = LIVE.M;
     return `<div class="match"><div class="sb duel" style="--hc:${LIVE.cols[0]};--ac:${LIVE.cols[1]}">
       <div class="sb-top"><button class="iconbtn" data-act="back" aria-label="Salir">${IC.back}</button><span class="muted up" style="font-size:12px;font-weight:700">${esc(stageLabel(f, lg))}</span><div style="display:flex;gap:6px">${[2, 3].map(n => `<button class="speed ${LIVE.speed === n ? 'on' : ''}" data-spd="${n}" aria-pressed="${LIVE.speed === n}">x${n}</button>`).join('')}</div></div>
-      <div class="sb-grid"><div class="sb-team">${crestSVG(T[0], 58)}<b>${esc(T[0].name)}</b></div>
+      <div class="sb-grid"><div class="sb-team">${crestSVG(T[0], 58)}<b>${esc(T[0].name)}</b><span class="bchip" id="bc0" hidden></span></div>
         <div class="sb-score"><div class="sc"><span id="s0">${M.score[0]}</span><i>-</i><span id="s1">${M.score[1]}</span></div><span class="clock" id="clk"><span class="dot"></span><span id="clkT">${clockLabel(M)}</span></span><span class="pens-sub" id="pensSub"></span></div>
-        <div class="sb-team">${crestSVG(T[1], 58)}<b>${esc(T[1].name)}</b></div></div>
+        <div class="sb-team">${crestSVG(T[1], 58)}<b>${esc(T[1].name)}</b><span class="bchip" id="bc1" hidden></span></div></div>
       <div class="mom" id="mom"></div>
       <div class="tl"><i id="tl" style="width:0%"></i></div></div>
       <div id="so" hidden style="padding:0 16px"></div>
@@ -2225,6 +2293,7 @@ SCREENS.match = {
       $('#clk').classList.toggle('off', M.phase !== 'play');
       const tot = M.knockout && M.period >= 3 ? 120 : 90;
       $('#tl').style.width = Math.min(100, (Math.min(M.minute, tot) / tot) * 100) + '%';
+      [0, 1].forEach(k => { const b = $('#bc' + k), bo = M.teams[k].boost; if (!b) return; b.hidden = !bo; if (bo) b.innerHTML = `${IC.bolt.replace('<svg', '<svg width="13" height="13"')} Arenga ${Math.max(0, bo.end - M.minute)}'`; });
       if (M.shootout) {
         const so = M.shootout; const b = $('#so'); b.hidden = false;
         const dots = k => { const arr = so.kicks[k].map(x => `<i class="${x ? 'y' : 'n'}"></i>`); while (arr.length < 5) arr.push('<i></i>'); return arr.join(''); };
@@ -2239,6 +2308,7 @@ SCREENS.match = {
       for (const e of evs) {
         feed.insertAdjacentHTML('afterbegin', evHTML(e, info, LIVE.T, LIVE.cols));
         if (e.type === 'goal' || e.type === 'penGoal') celebrate(e, M);
+        if (e.type === 'boost') boostFlash(e, M);
       }
       if (M.phase === 'play' && evs.length !== undefined) {
         // columna de momentum nueva
@@ -2254,7 +2324,7 @@ SCREENS.match = {
       }
       upd();
       if (M.done) { finishLive(p); return; }
-      const pause = evs.some(e => ['ht', 'ft90', 'etHt', 'pensStart'].includes(e.type));
+      const pause = evs.some(e => ['ht', 'ft90', 'etHt', 'pensStart', 'boost'].includes(e.type));
       const d = (M.phase === 'pens' ? 1500 : pause ? 3000 : 1000) / LIVE.speed;
       LIVE.timer = setTimeout(tick, d);
     }
@@ -2262,6 +2332,14 @@ SCREENS.match = {
     if (M.done) { upd(); finishLive(p, true); } else loop();
   },
 };
+function boostFlash(e, M) {
+  const p = M.players[e.pid]; const T = LIVE.T[e.team];
+  const d = document.createElement('div'); d.className = 'goalflash boostflash';
+  d.innerHTML = `<div class="bf">${avatar(p, 92, T)}<b>¡ARENGA!</b>${e.phrase ? `<q>${esc(e.phrase)}</q>` : ''}<small>${esc(p.name)} · ${esc(T.name)}</small></div>`;
+  document.body.appendChild(d); setTimeout(() => d.remove(), 2600);
+  if (DATA.settings.sound !== false) { try { const a = new Audio('sonidos/arenga.ogg'); a.volume = 0.9; a.play().catch(() => { }); } catch (x) { } }
+  if (DATA.settings.vibrate) { try { navigator.vibrate && navigator.vibrate([60, 40, 60]); } catch (x) { } }
+}
 function celebrate(e, M) {
   const s = $('#s' + e.team); if (s) { s.textContent = M.score[e.team]; s.classList.remove('pop'); void s.offsetWidth; s.classList.add('pop'); }
   const col = LIVE.cols[e.team];
