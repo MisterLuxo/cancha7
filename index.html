@@ -388,6 +388,41 @@ body{background:radial-gradient(900px 420px at 10% -140px,rgba(255,122,26,.20),t
 .mdsum .upc{color:var(--good)}
 .mdsum .downc{color:var(--rc)}
 
+/* v2.0: ficha de jugadora */
+.leader{width:100%;text-align:left}
+.leader:active{background:var(--surface2)}
+.psheet{display:flex;flex-direction:column;gap:14px}
+.ps-open{animation:psup .45s cubic-bezier(.2,.9,.2,1)}
+@keyframes psup{from{transform:translateY(60%);opacity:.3}}
+.ps-head{position:relative;display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:14px;padding:6px 2px}
+.ps-glow{position:absolute;inset:-30px -16px auto -16px;height:170px;background:radial-gradient(260px 140px at 25% 45%,color-mix(in srgb,var(--tc) 45%,transparent),transparent 70%);pointer-events:none;z-index:0}
+.ps-photo,.ps-info,.ps-skill{position:relative;z-index:1}
+.ps-photo .av{box-shadow:0 0 0 3px rgba(255,255,255,.85),0 10px 26px rgba(0,0,0,.45);animation:pspop .55s cubic-bezier(.2,1.5,.4,1)}
+@keyframes pspop{from{transform:scale(.6);opacity:0}}
+.ps-name{font:800 26px/1.05 var(--disp);text-transform:uppercase;letter-spacing:.02em}
+.ps-line{display:flex;align-items:center;gap:8px;margin-top:6px;font-weight:600;font-size:14px;flex-wrap:wrap}
+.ps-skill{width:52px;height:52px;border-radius:50%;display:grid;place-items:center;font:800 24px/1 var(--disp);color:#0B1219;box-shadow:0 6px 16px rgba(0,0,0,.35)}
+.ps-sec{background:var(--bg2);border:1px solid var(--line);border-radius:14px;padding:12px 12px 14px;display:flex;flex-direction:column;gap:10px}
+.ps-sec h4{margin:0;font:700 15px/1 var(--disp);letter-spacing:.1em;text-transform:uppercase;color:var(--muted);display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.ps-sec h4 small{font:600 12px/1 var(--body);letter-spacing:0;text-transform:none;color:var(--gold)}
+.ps-semi{width:100%;max-width:230px;margin:0 auto;display:block}
+.ps-semi-t{font:800 20px/1 var(--disp);fill:var(--text)}
+.ps-leg{display:flex;justify-content:center;gap:12px;flex-wrap:wrap;font-size:12px;color:var(--muted)}
+.ps-leg i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:5px}
+.ps-row{display:grid;grid-template-columns:repeat(7,1fr);gap:2px}
+.ps-it{display:flex;flex-direction:column;align-items:center;gap:3px;padding:6px 0;border-radius:10px}
+.ps-it b{font:800 20px/1 var(--disp)}
+.ps-it span{height:18px;display:grid;place-items:center;color:var(--muted)}
+.ps-it small{font-size:10px;color:var(--faint);text-transform:uppercase;letter-spacing:.04em}
+.ps-dot{display:block;width:12px;height:12px;border-radius:50%}
+.ps-tbl{display:flex;flex-direction:column;font-size:13px}
+.ps-tbl .h,.ps-tbl .r{display:grid;grid-template-columns:1.5fr repeat(3,.6fr) .8fr .9fr;align-items:center;gap:4px;padding:7px 4px;text-align:center}
+.ps-tbl .h{font:600 11px/1 var(--body);letter-spacing:.06em;text-transform:uppercase;color:var(--faint)}
+.ps-tbl .r{border-top:1px solid var(--line)}
+.ps-tbl .r span:first-child,.ps-tbl .h span:first-child{text-align:left;font-weight:700}
+.ps-tbl em{font-style:normal;font-size:10px;color:var(--accent);font-weight:600}
+.ps-tbl .rt{height:22px;min-width:34px;font-size:14px}
+
 </style>
 </head><body><div id="app"></div>
 <script>
@@ -932,6 +967,8 @@ const IC = {
   wand: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 20L15 9M14 4v3M19 9h-3M18 5l-2 2M10 5l1 1M19 13l-1-1"/></svg>',
   inj: '<svg viewBox="0 0 24 24"><rect x="2" y="2" width="20" height="20" rx="5" fill="#fff"/><path d="M10 6h4v4h4v4h-4v4h-4v-4H6v-4h4z" fill="#FF4D5E"/></svg>',
   hist: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 103-6.7L3 8"/><path d="M3 3v5h5M12 7v5l3 2"/></svg>',
+  shirt: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M8 3l4 2 4-2 5 4-3 3-2-1v12H8V9L6 10 3 7z"/></svg>',
+  boot: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"><path d="M4 6h5l1 5 8 2c2 .5 3 1.5 3 3v1H4z"/><path d="M4 20h17M9 17v3M14 17v3"/></svg>',
   crown: '<svg viewBox="0 0 24 24" fill="var(--gold)"><path d="M3 18L2 7l5 4 5-7 5 7 5-4-1 11z"/></svg>',
 };
 
@@ -1153,7 +1190,9 @@ function createLeague(name, type, teamIds) {
   const g = genFixtures(teamIds, type);
   return { id: uid(), name, type, teams: teamIds.slice(), fixtures: g.fixtures, byes: g.byes, draw: g.draw, createdAt: Date.now(), champion: null, season: 1, history: [], out: {} };
 }
-function migrateLeague(lg) { if (lg.type === 'po' && !lg.hbal) { balanceHome(lg.fixtures || []); lg.hbal = 1; } if (!lg.season) lg.season = 1; if (!lg.history) lg.history = []; if (!lg.out) lg.out = {}; (lg.fixtures || []).forEach(f => f.res && f.res.lines.forEach(l => { l.pos = normPos(l.pos); })); }
+function migrateLeague(lg) {
+  // temporada ya cerrada pero aún sin registro por jugadora: se completa con los partidos que siguen guardados
+  if (lg.history && lg.history.length) { const h = lg.history[lg.history.length - 1]; if (!h.players && h.n === lg.season && lg.fixtures.some(f => f.res)) h.players = seasonPlayers(lg.fixtures); } if (lg.type === 'po' && !lg.hbal) { balanceHome(lg.fixtures || []); lg.hbal = 1; } if (!lg.season) lg.season = 1; if (!lg.history) lg.history = []; if (!lg.out) lg.out = {}; (lg.fixtures || []).forEach(f => f.res && f.res.lines.forEach(l => { l.pos = normPos(l.pos); })); }
 function migrateTeams() { DATA.teams.forEach(t => t.players.forEach(p => { p.pos = normPos(p.pos); })); }
 function teamSnap(id) { const t = teamById(id); return t ? { id, name: t.name, abbr: t.abbr, logo: t.logo } : { id, name: '—', abbr: '—' }; }
 function runnerUpId(lg) {
@@ -1175,12 +1214,12 @@ function archiveSeason(lg) {
       return { name: d.name, champion: teamSnap(st[0].id), runnerUp: st[1] ? teamSnap(st[1].id) : null, scorers: topScorers(sub), up: mv[i].up.map(teamSnap), down: mv[i].down.map(teamSnap),
         table: st.map(r => ({ id: r.id, pts: r.pts, g: r.g, e: r.e, p: r.p, gf: r.gf, gc: r.gc })) };
     });
-    lg.history.push({ n: lg.season, type: 'md', champion: divs[0].champion, runnerUp: divs[0].runnerUp, scorers: divs[0].scorers, divs, finishedAt: Date.now() });
+    lg.history.push({ n: lg.season, type: 'md', champion: divs[0].champion, runnerUp: divs[0].runnerUp, scorers: divs[0].scorers, divs, players: seasonPlayers(lg.fixtures), finishedAt: Date.now() });
     return;
   }
   const scorers = topScorers(lg);
   const ru = runnerUpId(lg);
-  lg.history.push({ n: lg.season, type: lg.type, champion: teamSnap(lg.champion), runnerUp: ru ? teamSnap(ru) : null, scorers, finishedAt: Date.now(),
+  lg.history.push({ n: lg.season, type: lg.type, champion: teamSnap(lg.champion), runnerUp: ru ? teamSnap(ru) : null, scorers, players: seasonPlayers(lg.fixtures), finishedAt: Date.now(),
     table: standings(lg).map(r => ({ id: r.id, pts: r.pts, g: r.g, e: r.e, p: r.p, gf: r.gf, gc: r.gc })) });
 }
 function newSeason(lg) {
@@ -1350,6 +1389,35 @@ function newSeasonMD(lg) {
   lg.divs.forEach((d, i) => { d.teams = d.teams.filter(id => !mv[i].down.includes(id) && !mv[i].up.includes(id)); });
   mv.forEach((m, i) => { if (i > 0) lg.divs[i - 1].teams.push(...m.up); if (i < lg.divs.length - 1) lg.divs[i + 1].teams.push(...m.down); });
   genMD(lg); lg.season = (lg.season || 1) + 1; lg.champion = null; lg.out = {};
+}
+
+/* ===== Ficha de jugadora dentro de una liga ===== */
+// resumen por jugadora de un conjunto de partidos: pj, titular, goles, asistencias, tarjetas, nota y partidos de su equipo
+function seasonPlayers(fixtures) {
+  const P = {}, TM = {};
+  fixtures.filter(f => f.res).forEach(f => {
+    TM[f.home] = (TM[f.home] || 0) + 1; TM[f.away] = (TM[f.away] || 0) + 1;
+    f.res.lines.forEach(l => {
+      const tid = l.team === 0 ? f.home : f.away;
+      const o = P[l.pid] || (P[l.pid] = { pid: l.pid, team: tid, name: l.name, pj: 0, st: 0, goals: 0, assists: 0, yc: 0, rc: 0, rsum: 0, mvp: 0 });
+      o.team = tid; o.pj++; if (l.start) o.st++; o.goals += l.goals; o.assists += l.assists; o.yc += l.yc; o.rc += l.rc; o.rsum = Math.round((o.rsum + l.rating) * 10) / 10;
+      if (f.res.mvp === l.pid) o.mvp++;
+    });
+  });
+  return Object.values(P).map(o => Object.assign(o, { tm: TM[o.team] || o.pj }));
+}
+function playerLeagueData(lg, pid) {
+  const team = DATA.teams.find(t => t.players.some(p => p.id === pid));
+  const pl = team && team.players.find(p => p.id === pid);
+  const archivedNow = lg.history.some(h => h.n === lg.season);
+  const cur = archivedNow ? null : seasonPlayers(lg.fixtures).find(o => o.pid === pid) || null;
+  const curTeamMatches = archivedNow || !team ? 0 : lg.fixtures.filter(f => f.res && (f.home === team.id || f.away === team.id)).length;
+  const seasons = lg.history.filter(h => h.players).map(h => { const o = h.players.find(x => x.pid === pid); return o ? Object.assign({ n: h.n, champ: h.champion && h.champion.id === o.team }, o) : null; }).filter(Boolean);
+  if (cur) seasons.push(Object.assign({ n: lg.season, live: true }, cur));
+  const tot = seasons.reduce((a, o) => { ['pj', 'st', 'goals', 'assists', 'yc', 'rc', 'rsum', 'mvp'].forEach(k => a[k] += o[k]); a.titles += o.champ ? 1 : 0; return a; }, { pj: 0, st: 0, goals: 0, assists: 0, yc: 0, rc: 0, rsum: 0, mvp: 0, titles: 0 });
+  const last = seasons[seasons.length - 1];
+  const now = cur || (archivedNow ? seasons.find(o => o.n === lg.season) : null);
+  return { pl, team, cur: now, curTM: now ? (cur ? curTeamMatches : now.tm) : curTeamMatches, seasons, tot, name: pl ? pl.name : last ? last.name : '?' };
 }
 
 /* ===== Interfaz: navegación y pantallas ===== */
@@ -1596,7 +1664,7 @@ function leaderBlock(title, arr, valFn, subFn) {
   if (!arr.length) return '';
   return `<div class="sec-t"><h2>${title}</h2></div><div class="card list">${arr.map((o, i) => {
     const T = teamById(o.team);
-    return `<div class="leader ${i === 0 ? 'first' : ''}"><span class="rk">${i + 1}</span>${avatar(o, 42, T)}<div class="grow" style="flex:1;min-width:0"><div style="font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(o.name)}</div><div class="muted" style="font-size:13px;display:flex;align-items:center;gap:6px">${crestSVG(T, 16)}${esc(T ? T.abbr : '')} · ${subFn(o)}</div></div><span class="v num">${valFn(o)}</span></div>`;
+    return `<button class="leader ${i === 0 ? 'first' : ''}" data-pp="${o.pid}"><span class="rk">${i + 1}</span>${avatar(o, 42, T)}<div class="grow" style="flex:1;min-width:0"><div style="font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(o.name)}</div><div class="muted" style="font-size:13px;display:flex;align-items:center;gap:6px">${crestSVG(T, 16)}${esc(T ? T.abbr : '')} · ${subFn(o)}</div></div><span class="v num">${valFn(o)}</span></button>`;
   }).join('')}</div>`;
 }
 function tabStats(lg) {
@@ -1663,6 +1731,7 @@ SCREENS.league = {
     const lg = leagueById(p.id); if (!lg) return;
     app().querySelectorAll('[data-lt]').forEach(b => b.onclick = () => { p.tab = b.dataset.lt; p._scroll = 0; render(); });
     app().querySelectorAll('[data-div]').forEach(b => b.onclick = () => { p.div = +b.dataset.div; p._scroll = 0; render(); });
+    app().querySelectorAll('[data-pp]').forEach(b => b.onclick = () => playerSheet2(lg, b.dataset.pp));
     const openFx = id => { const f = lg.fixtures.find(x => x.id === id); if (!f) return; p._scroll = scrollY; if (f.res) go('summary', { lg: lg.id, fx: f.id, tab: 'ev' }); else if (isPlayable(lg, f)) go('prematch', { lg: lg.id, fx: f.id }); else toast('Primero se juega el partido de ida'); };
     app().querySelectorAll('[data-fx]').forEach(b => b.onclick = () => openFx(b.dataset.fx));
     app().querySelectorAll('[data-play]').forEach(b => b.onclick = () => openFx(b.dataset.play));
@@ -1843,7 +1912,7 @@ SCREENS.settings = {
       <div class="sec-t"><h2>Instalar en Android</h2></div>
       <div class="card" style="padding:14px;font-size:14px;line-height:1.5"><ol style="margin:0;padding-left:20px;display:flex;flex-direction:column;gap:6px">
         <li>Abre la app en <b>Chrome</b>.</li><li>Toca el menú <b>⋮</b> y elige <b>Instalar app</b> (o <b>Añadir a pantalla de inicio</b>).</li><li>Se abrirá desde su ícono, a pantalla completa y sin internet.</li></ol></div>
-      <p class="muted" style="text-align:center;font-size:12px;margin:4px 0 0">Cancha 7 · v1.9.3</p>
+      <p class="muted" style="text-align:center;font-size:12px;margin:4px 0 0">Cancha 7 · v2.0</p>
     </main>${tabbar('settings')}`;
   },
   after() {
@@ -1878,6 +1947,48 @@ function loadSample() {
   const teams = sampleData(); DATA.teams.push(...teams);
   const lg = createLeague('Liga de ejemplo', 'po', teams.map(t => t.id)); lg.sample = true; DATA.leagues.push(lg);
   DATA.sample = true; save();
+}
+
+/* ---------- FICHA DE JUGADORA (Stats de la liga) ---------- */
+function statRow(o, avg) {
+  const it = (v, ic, lbl, fmt) => `<div class="ps-it"><b class="num" data-count="${v}" data-fmt="${fmt || ''}">${fmt === '1' ? '0.0' : 0}</b><span>${ic}</span><small>${lbl}</small></div>`;
+  return `<div class="ps-row">${it(avg, '<i class="ps-dot" style="background:var(--good)"></i>', 'Nota', '1')}${it(o.pj, IC.shirt, 'Partidos')}${it(o.goals, IC.ball.replace('<svg', '<svg width="18" height="18"'), 'Goles')}${it(o.assists, IC.boot, 'Asist.')}${it(o.mvp, IC.crown.replace('<svg', '<svg width="18" height="18"'), 'MVP')}${it(o.yc, '<span class="card-ic" style="background:var(--yc);width:12px;height:16px"></span>', 'Amarillas')}${it(o.rc, '<span class="card-ic" style="background:var(--rc);width:12px;height:16px"></span>', 'Rojas')}</div>`;
+}
+function semi(st, sub, np) {
+  const tot = Math.max(1, st + sub + np), R = 70, L = Math.PI * R;
+  const seg = (from, len, col) => `<path d="M10 85 A${R} ${R} 0 0 1 150 85" fill="none" stroke="${col}" stroke-width="22" stroke-dasharray="0 ${L}" data-dash="${(len / tot * L).toFixed(1)} ${L}" data-off="${(-from / tot * L).toFixed(1)}" style="transition:stroke-dasharray .9s cubic-bezier(.2,.8,.2,1),stroke-dashoffset .9s cubic-bezier(.2,.8,.2,1)"/>`;
+  return `<svg viewBox="0 0 160 95" class="ps-semi"><path d="M10 85 A${R} ${R} 0 0 1 150 85" fill="none" stroke="var(--surface3)" stroke-width="22"/>${seg(0, st, 'var(--good)')}${seg(st, sub, '#7FE0C0')}${seg(st + sub, np, '#5F7488')}<text x="80" y="80" text-anchor="middle" class="ps-semi-t">${st + sub}/${st + sub + np}</text></svg>
+    <div class="ps-leg"><span><i style="background:var(--good)"></i>Titular ${st}</span><span><i style="background:#7FE0C0"></i>Suplente ${sub}</span><span><i style="background:#5F7488"></i>No jugó ${np}</span></div>`;
+}
+function playerSheet2(lg, pid) {
+  const D = playerLeagueData(lg, pid); const T = D.team; const pl = D.pl || { id: pid, name: D.name };
+  const cur = D.cur; const avg = o => o && o.pj ? o.rsum / o.pj : 0;
+  const curBlock = cur ? `${semi(cur.st, cur.pj - cur.st, Math.max(0, D.curTM - cur.pj))}${statRow(cur, avg(cur))}` : `<div class="muted" style="text-align:center;padding:10px 0">Aún no juega esta temporada.</div>`;
+  const hist = D.seasons.length ? `<div class="ps-tbl"><div class="h"><span>Temp.</span><span>PJ</span><span>G</span><span>A</span><span>Tarj.</span><span>Nota</span></div>${D.seasons.slice().reverse().map(o => `<div class="r"><span>#${o.n}${o.champ ? ' ' + IC.trophy.replace('<svg', '<svg width="13" height="13" style="color:var(--gold);vertical-align:-2px"') : ''}${o.live ? ' <em>en juego</em>' : ''}</span><span class="num">${o.pj}</span><span class="num">${o.goals}</span><span class="num">${o.assists}</span><span class="num">${o.yc}/${o.rc}</span><span><b class="rt" style="background:${ratingColor(avg(o))}">${avg(o).toFixed(1)}</b></span></div>`).join('')}</div>` : '';
+  openSheet(`<div class="psheet">
+    <div class="ps-head">${T ? `<div class="ps-glow" style="--tc:${(teamColors(T, T)[0])}"></div>` : ''}
+      <div class="ps-photo">${avatar(pl, 112, T)}</div>
+      <div class="ps-info"><div class="ps-name">${esc(D.name)}</div>
+        ${T ? `<div class="ps-line">${crestSVG(T, 22)}<span>${esc(T.name)}</span></div>` : ''}
+        ${D.pl ? `<div class="ps-line"><span class="chip">${POS[D.pl.pos] || ''}</span><span class="chip">#${D.pl.num}</span></div>` : ''}
+      </div>
+      ${D.pl ? `<div class="ps-skill" style="background:${skillColor(D.pl.skill)}">${D.pl.skill}</div>` : ''}
+    </div>
+    <div class="ps-sec"><h4>Temporada #${lg.season}</h4>${curBlock}</div>
+    <div class="ps-sec"><h4>Histórico en ${esc(lg.name)} <small>${D.seasons.length} ${D.seasons.length === 1 ? 'temporada' : 'temporadas'}${D.tot.titles ? ` · ${D.tot.titles} ${D.tot.titles === 1 ? 'título' : 'títulos'}` : ''}</small></h4>${statRow(D.tot, avg(D.tot))}${hist}</div>
+    <button class="btn ghost block" id="psClose">Cerrar</button></div>`, bg => {
+    $('#psClose', bg).onclick = closeSheet;
+    const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      bg.querySelectorAll('[data-dash]').forEach(p => { p.setAttribute('stroke-dasharray', p.dataset.dash); p.setAttribute('stroke-dashoffset', p.dataset.off); p.style.strokeDasharray = p.dataset.dash; p.style.strokeDashoffset = p.dataset.off; });
+      bg.querySelectorAll('[data-count]').forEach(el => {
+        const to = +el.dataset.count, dec = el.dataset.fmt === '1', t0 = performance.now(), dur = reduce ? 0 : 800;
+        const f = t => { const k = dur ? Math.min(1, (t - t0) / dur) : 1; const e = 1 - Math.pow(1 - k, 3); el.textContent = dec ? (to * e).toFixed(1) : Math.round(to * e); if (k < 1) requestAnimationFrame(f); };
+        requestAnimationFrame(f);
+      });
+    }));
+  });
+  const sh = $('#sheet .sheet'); if (sh) sh.classList.add('ps-open');
 }
 
 /* ===== Pre-partido, partido en vivo y resumen ===== */
