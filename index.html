@@ -366,6 +366,28 @@ body{background:radial-gradient(900px 420px at 10% -140px,rgba(255,122,26,.20),t
 /* v1.8.2: fotos con transparencia real */
 .av.ph{background:transparent}
 
+/* v1.9: multidivisión */
+.stepper{display:inline-flex;align-items:center;gap:10px}
+.stepper button{width:34px;height:34px;border-radius:10px;border:1.5px solid var(--line);font:800 20px/1 var(--disp);color:var(--text)}
+.stepper button[disabled]{opacity:.35}
+.stepper b{min-width:22px;text-align:center;font:800 22px/1 var(--disp)}
+.mddiv{padding:14px;display:flex;flex-direction:column;gap:12px}
+.mddiv .hd{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.mddiv .hd b{font-size:20px;letter-spacing:.04em}
+.mdmove{display:flex;align-items:center;gap:12px;padding:10px 14px;margin:-6px 12px;border-radius:12px;background:rgba(53,208,127,.07);border:1px dashed rgba(53,208,127,.4);font-size:14px}
+.mdmove .ar{font-size:22px;color:var(--good)}
+.divchips{display:flex;gap:6px;margin-top:8px;overflow-x:auto}
+.divchips button{flex:1;min-width:52px;min-height:34px;border-radius:9px;border:1.5px solid var(--line);font:700 15px/1 var(--disp);color:var(--muted);letter-spacing:.04em}
+.divchips button.on{border-color:var(--gold);color:var(--gold);background:rgba(255,201,64,.08)}
+.tbl tr.zup .pos{color:var(--good)}
+.tbl tr.zup .pos::before{content:"";position:absolute;left:0;top:8px;bottom:8px;width:3px;border-radius:2px;background:var(--good)}
+.tbl tr.zdown .pos{color:var(--rc)}
+.tbl tr.zdown .pos::before{content:"";position:absolute;left:0;top:8px;bottom:8px;width:3px;border-radius:2px;background:var(--rc)}
+.mdsum{display:flex;flex-direction:column;gap:3px;font-size:13px;color:var(--muted)}
+.mdsum b{color:var(--text);font-size:14px}
+.mdsum .upc{color:var(--good)}
+.mdsum .downc{color:var(--rc)}
+
 </style>
 </head><body><div id="app"></div>
 <script>
@@ -1115,7 +1137,7 @@ function balanceHome(fixtures) {
   }
 }
 // Sin ventaja de local: la final y la fase regular (una sola vuelta) de las ligas con play-offs
-function isNeutral(lg, f) { return f.stage === 'F' || (lg.type === 'po' && f.stage === 'L'); }
+function isNeutral(lg, f) { if (isMD(lg)) return f.div != null && lg.divs[f.div] && lg.divs[f.div].fmt !== 'dbl'; return f.stage === 'F' || (lg.type === 'po' && f.stage === 'L'); }
 function genFixtures(teamIds, type) {
   const ids = teamIds.slice().sort(() => Math.random() - .5);
   const rr = roundRobin(ids);
@@ -1135,18 +1157,33 @@ function migrateTeams() { DATA.teams.forEach(t => t.players.forEach(p => { p.pos
 function teamSnap(id) { const t = teamById(id); return t ? { id, name: t.name, abbr: t.abbr, logo: t.logo } : { id, name: '—', abbr: '—' }; }
 function runnerUpId(lg) {
   if (!lg.champion) return null;
+  if (isMD(lg)) { const st = standings(divSub(lg, 0)); return st[1] ? st[1].id : null; }
   if (lg.type === 'po') { const F = lg.fixtures.find(f => f.stage === 'F'); return F ? (F.home === lg.champion ? F.away : F.home) : null; }
   const st = standings(lg); return st[1] ? st[1].id : null;
 }
+function topScorers(sub) {
+  const P = playerStats(sub); const max = Math.max(0, ...P.map(o => o.goals));
+  return max > 0 ? P.filter(o => o.goals === max).map(o => ({ pid: o.pid, name: o.name, photo: o.photo || null, goals: o.goals, pj: o.pj, team: teamSnap(o.team) })) : [];
+}
 function archiveSeason(lg) {
   if (!lg.champion || lg.history.some(h => h.n === lg.season)) return;
-  const P = playerStats(lg); const max = Math.max(0, ...P.map(o => o.goals));
-  const scorers = max > 0 ? P.filter(o => o.goals === max).map(o => ({ pid: o.pid, name: o.name, photo: o.photo || null, goals: o.goals, pj: o.pj, team: teamSnap(o.team) })) : [];
+  if (isMD(lg)) {
+    const mv = mdMovements(lg);
+    const divs = lg.divs.map((d, i) => {
+      const sub = divSub(lg, i); const st = standings(sub);
+      return { name: d.name, champion: teamSnap(st[0].id), runnerUp: st[1] ? teamSnap(st[1].id) : null, scorers: topScorers(sub), up: mv[i].up.map(teamSnap), down: mv[i].down.map(teamSnap),
+        table: st.map(r => ({ id: r.id, pts: r.pts, g: r.g, e: r.e, p: r.p, gf: r.gf, gc: r.gc })) };
+    });
+    lg.history.push({ n: lg.season, type: 'md', champion: divs[0].champion, runnerUp: divs[0].runnerUp, scorers: divs[0].scorers, divs, finishedAt: Date.now() });
+    return;
+  }
+  const scorers = topScorers(lg);
   const ru = runnerUpId(lg);
   lg.history.push({ n: lg.season, type: lg.type, champion: teamSnap(lg.champion), runnerUp: ru ? teamSnap(ru) : null, scorers, finishedAt: Date.now(),
     table: standings(lg).map(r => ({ id: r.id, pts: r.pts, g: r.g, e: r.e, p: r.p, gf: r.gf, gc: r.gc })) });
 }
 function newSeason(lg) {
+  if (isMD(lg)) return newSeasonMD(lg);
   const ids = lg.teams.filter(id => teamById(id));
   const g = genFixtures(ids, lg.type);
   lg.teams = ids; lg.fixtures = g.fixtures; lg.byes = g.byes; lg.draw = g.draw;
@@ -1221,6 +1258,11 @@ function semiTies(lg) {
 }
 function progressLeague(lg) {
   migrateLeague(lg);
+  if (isMD(lg)) {
+    lg.divs.forEach((d, i) => { const sub = divSub(lg, i); d.champion = sub.fixtures.length && leagueDone(sub) ? standings(sub)[0].id : null; });
+    lg.champion = lg.divs.every(d => d.champion) ? lg.divs[0].champion : null;
+    archiveSeason(lg); return;
+  }
   // genera play-offs / final y define campeona
   if (lg.type === 'po') {
     if (leagueDone(lg) && !lg.fixtures.some(f => f.stage === 'SF')) {
@@ -1256,6 +1298,7 @@ function nextFixture(lg) {
   return lg.fixtures.filter(f => isPlayable(lg, f)).sort((a, b) => stageOrder(a) - stageOrder(b) || a.round - b.round)[0] || null;
 }
 function stageLabel(f, lg) {
+  if (isMD(lg) && f.div != null && lg.divs[f.div]) return lg.divs[f.div].name + ' · Jornada ' + f.round;
   if (f.stage === 'L') return 'Jornada ' + f.round;
   if (f.stage === 'SF') return 'Semifinal ' + (f.tie + 1) + ' · ' + (f.round === 1 ? 'Ida' : 'Vuelta');
   return 'Final';
@@ -1273,6 +1316,39 @@ function playerStats(lg) {
   // nombre actualizado si la jugadora aún existe
   Object.values(P).forEach(o => { const t = teamById(o.team); const p = t && t.players.find(x => x.id === o.pid); if (p) { o.name = p.name; o.photo = p.photo; } o.avg = o.rsum / o.pj; });
   return Object.values(P);
+}
+
+/* ===== Liga multidivisión ===== */
+function isMD(lg) { return !!lg && lg.type === 'md'; }
+function divSub(lg, i) { const d = lg.divs[i]; return { id: lg.id, type: d.fmt, teams: d.teams, fixtures: lg.fixtures.filter(f => f.div === i), draw: d.draw || {}, byes: d.byes || {}, season: lg.season }; }
+function genMD(lg) {
+  lg.fixtures = [];
+  lg.divs.forEach((d, i) => {
+    d.teams = d.teams.filter(id => teamById(id));
+    const g = genFixtures(d.teams, d.fmt); g.fixtures.forEach(f => { f.div = i; });
+    d.byes = g.byes; d.draw = g.draw; d.champion = null; lg.fixtures.push(...g.fixtures);
+  });
+  lg.teams = lg.divs.flatMap(d => d.teams);
+}
+function createMDLeague(name, divs, moves) {
+  const lg = { id: uid(), name, type: 'md', divs: divs.map((d, i) => ({ name: d.name || `${i + 1}ª División`, fmt: d.fmt, teams: d.teams.slice() })), moves: moves.slice(), teams: [], fixtures: [], createdAt: Date.now(), champion: null, season: 1, history: [], out: {} };
+  genMD(lg); return lg;
+}
+// quiénes suben y bajan según la tabla actual de cada división
+function mdMovements(lg) {
+  const res = lg.divs.map(() => ({ up: [], down: [] }));
+  for (let i = 0; i < lg.divs.length - 1; i++) {
+    const k = lg.moves[i] || 0; if (!k) continue;
+    const a = standings(divSub(lg, i)), b = standings(divSub(lg, i + 1));
+    res[i].down = a.slice(-k).map(r => r.id); res[i + 1].up = b.slice(0, k).map(r => r.id);
+  }
+  return res;
+}
+function newSeasonMD(lg) {
+  const mv = mdMovements(lg);
+  lg.divs.forEach((d, i) => { d.teams = d.teams.filter(id => !mv[i].down.includes(id) && !mv[i].up.includes(id)); });
+  mv.forEach((m, i) => { if (i > 0) lg.divs[i - 1].teams.push(...m.up); if (i < lg.divs.length - 1) lg.divs[i + 1].teams.push(...m.down); });
+  genMD(lg); lg.season = (lg.season || 1) + 1; lg.champion = null; lg.out = {};
 }
 
 /* ===== Interfaz: navegación y pantallas ===== */
@@ -1353,6 +1429,7 @@ function bindSampleBanner() {
     DATA.sample = false; save(); render(); toast('Datos de ejemplo borrados');
   });
 }
+const typeLabel = t => t === 'po' ? 'Liga + Play-offs' : t === 'md' ? 'Multidivisión' : 'Ida y vuelta';
 SCREENS.leagues = {
   html() {
     const L = DATA.leagues.slice().sort((a, b) => b.createdAt - a.createdAt);
@@ -1361,12 +1438,12 @@ SCREENS.leagues = {
       const done = lg.fixtures.filter(f => f.res).length;
       const nx = nextFixture(lg); const ch = lg.champion && teamById(lg.champion);
       const sn = `Temporada #${lg.season || 1}`;
-      const status = ch ? `<div style="display:flex;align-items:center;gap:8px;color:var(--gold);font-weight:700">${IC.crown}<span>${sn} · Campeón: ${esc(ch.name)}</span></div>`
+      const status = ch ? `<div style="display:flex;align-items:center;gap:8px;color:var(--gold);font-weight:700">${IC.crown.replace('<svg', '<svg width="20" height="20" style="flex:none"')}<span>${sn} · Campeón: ${esc(ch.name)}</span></div>`
         : nx ? `<div class="muted" style="font-size:14px">${sn} · ${esc(stageLabel(nx, lg))} · Próximo: <b style="color:var(--text)">${esc(teamById(nx.home)?.abbr || '?')} vs ${esc(teamById(nx.away)?.abbr || '?')}</b></div>` : '';
       const cs = lg.teams.map(id => ((teamById(id) || {}).logo || {}).c1 || '#555'); const w = 100 / Math.max(1, cs.length);
       const band = `<span class="lg-band" style="background:linear-gradient(90deg,${cs.map((c, i) => `${c} ${(i * w).toFixed(1)}% ${((i + 1) * w).toFixed(1)}%`).join(',')})"></span>`;
-      return `<button class="card lg-card" data-lg="${lg.id}">${band}<div class="hd"><h3>${esc(lg.name)}</h3><span class="chip ${lg.type === 'po' ? 'blue' : 'acc'}">${lg.type === 'po' ? 'Liga + Play-offs' : 'Ida y vuelta'}</span></div>
-        <div class="crest-strip">${lg.teams.map(id => crestSVG(teamById(id), 28)).join('')}</div>
+      return `<button class="card lg-card" data-lg="${lg.id}">${band}<div class="hd"><h3>${esc(lg.name)}</h3><span class="chip ${lg.type === 'po' ? 'blue' : lg.type === 'md' ? 'gold' : 'acc'}">${typeLabel(lg.type)}</span></div>
+        <div class="crest-strip">${lg.teams.slice(0, 12).map(id => crestSVG(teamById(id), 28)).join('')}${lg.teams.length > 12 ? `<span class="muted" style="align-self:center;margin-left:8px;font-weight:700">+${lg.teams.length - 12}</span>` : ''}${isMD(lg) ? `<span class="muted" style="align-self:center;margin-left:10px;font-size:13px">${lg.divs.length} divisiones</span>` : ''}</div>
         <div class="prog"><i style="width:${Math.round(100 * done / Math.max(1, tot))}%"></i></div>${status}</button>`;
     }).join('');
     const noTeams = DATA.teams.length < 2;
@@ -1399,23 +1476,71 @@ SCREENS.newLeague = {
       <div class="field"><span class="flabel">Formato</span><div class="types">
         <button class="type ${p.type === 'dbl' ? 'on' : ''}" data-type="dbl"><span class="radio"></span><div><b>Ida y vuelta</b><p>Todas contra todas, dos veces. Gana la liga quien sume más puntos.</p></div></button>
         <button class="type ${p.type === 'po' ? 'on' : ''}" data-type="po"><span class="radio"></span><div><b>Liga + Play-offs</b><p>Una sola vuelta. Las 4 primeras juegan semifinales de ida y vuelta y una final a partido único.</p></div></button>
+        <button class="type ${p.type === 'md' ? 'on' : ''}" data-type="md"><span class="radio"></span><div><b>Multidivisión</b><p>Varias divisiones con ascensos y descensos entre temporadas. El campeón es el primero de la 1ª división.</p></div></button>
       </div></div>
-      <div class="sec-t"><h2>Equipos</h2><span class="muted num">${n} elegidos</span></div>
+      ${p.type === 'md' ? mdBuilder(p) : `<div class="sec-t"><h2>Equipos</h2><span class="muted num">${n} elegidos</span></div>
       <div class="card list">${teams || '<div class="empty"><p>No hay equipos creados.</p></div>'}</div>
-      ${n >= 2 ? `<p class="muted" style="margin:0;text-align:center">${rounds} jornadas · ${matches} partidos</p>` : ''}
-    </main><div class="bottomcta"><button class="btn pri block" id="mk" ${n >= min ? '' : 'disabled'}>${n >= min ? 'Crear liga' : `Elige al menos ${min} equipos`}</button></div>`;
+      ${n >= 2 ? `<p class="muted" style="margin:0;text-align:center">${rounds} jornadas · ${matches} partidos</p>` : ''}`}
+    </main><div class="bottomcta">${p.type === 'md' ? (() => { const err = mdError(p); return `<button class="btn pri block" id="mk" ${err ? 'disabled' : ''}>${err || 'Crear liga'}</button>`; })() : `<button class="btn pri block" id="mk" ${n >= min ? '' : 'disabled'}>${n >= min ? 'Crear liga' : `Elige al menos ${min} equipos`}</button>`}</div>`;
   },
   after(p) {
     $('#lgName').oninput = e => { p.name = e.target.value; };
     app().querySelectorAll('[data-type]').forEach(b => b.onclick = () => { p.type = b.dataset.type; p._scroll = scrollY; render(); });
     app().querySelectorAll('[data-t]').forEach(b => b.onclick = () => { const id = b.dataset.t; p.sel = p.sel.includes(id) ? p.sel.filter(x => x !== id) : [...p.sel, id]; p._scroll = scrollY; render(); });
+    if (p.type === 'md') bindMdBuilder(p);
     $('#mk').onclick = () => {
       const name = (p.name || '').trim() || 'Liga ' + (DATA.leagues.length + 1);
-      const lg = createLeague(name, p.type, p.sel); DATA.leagues.push(lg); save();
+      if (p.type === 'md' && mdError(p)) return;
+      const lg = p.type === 'md' ? createMDLeague(name, p.divs.map((d, i) => ({ name: `${i + 1}ª División`, fmt: d.fmt, teams: d.teams })), p.moves) : createLeague(name, p.type, p.sel); DATA.leagues.push(lg); save();
       NAV.stack = [{ name: 'leagues', params: {} }]; go('league', { id: lg.id, tab: 'fx' }); toast('Liga creada');
     };
   },
 };
+
+/* ---------- CONSTRUCTOR MULTIDIVISIÓN ---------- */
+function mdInit(p) {
+  if (!p.divs) { p.divs = [{ fmt: 'dbl', teams: [] }, { fmt: 'dbl', teams: [] }]; p.moves = [1]; }
+}
+function mdMatches(d) { const n = d.teams.length; return n < 2 ? 0 : n * (n - 1) / 2 * (d.fmt === 'dbl' ? 2 : 1); }
+function mdError(p) {
+  mdInit(p);
+  for (let i = 0; i < p.divs.length; i++) if (p.divs[i].teams.length < 2) return `La ${i + 1}ª división necesita al menos 2 equipos`;
+  for (let i = 0; i < p.moves.length; i++) { const mx = Math.min(p.divs[i].teams.length, p.divs[i + 1].teams.length) - 1; if (p.moves[i] > mx) return `Demasiados ascensos entre ${i + 1}ª y ${i + 2}ª`; }
+  return '';
+}
+function mdBuilder(p) {
+  mdInit(p);
+  const blocks = p.divs.map((d, i) => {
+    const crests = d.teams.map(id => crestSVG(teamById(id), 26)).join('');
+    const mv = i < p.moves.length ? (() => { const mx = Math.max(0, Math.min(p.divs[i].teams.length, p.divs[i + 1].teams.length) - 1); return `<div class="mdmove"><span class="ar">⇅</span><div style="flex:1"><b>Ascensos y descensos</b><div class="muted" style="font-size:12px">Bajan ${p.moves[i]} de la ${i + 1}ª y suben ${p.moves[i]} de la ${i + 2}ª</div></div><div class="stepper"><button data-mv="${i}" data-d="-1" ${p.moves[i] <= 0 ? 'disabled' : ''}>−</button><b class="num">${p.moves[i]}</b><button data-mv="${i}" data-d="1" ${p.moves[i] >= mx ? 'disabled' : ''}>+</button></div></div>`; })() : '';
+    return `<div class="card mddiv"><div class="hd"><b class="disp up">${i + 1}ª División</b><span class="muted num" style="font-size:13px">${d.teams.length} equipos · ${mdMatches(d)} partidos</span></div>
+      <div class="seg" style="margin:0"><button class="${d.fmt === 'dbl' ? 'on' : ''}" data-fmt="${i}" data-v="dbl">Ida y vuelta</button><button class="${d.fmt === 'one' ? 'on' : ''}" data-fmt="${i}" data-v="one">Una vuelta</button></div>
+      <div class="crest-strip" style="min-height:26px">${crests || '<span class="muted" style="font-size:13px">Sin equipos todavía</span>'}</div>
+      <button class="btn ghost sm block" data-pickdiv="${i}">Elegir equipos</button></div>${mv}`;
+  }).join('');
+  const total = p.divs.reduce((a, d) => a + mdMatches(d), 0);
+  return `<div class="sec-t"><h2>Divisiones</h2><div class="stepper"><button id="divMinus" ${p.divs.length <= 2 ? 'disabled' : ''}>−</button><b class="num">${p.divs.length}</b><button id="divPlus" ${p.divs.length >= 6 ? 'disabled' : ''}>+</button></div></div>
+    ${blocks}<p class="muted" style="margin:0;text-align:center">${total} partidos por temporada</p>`;
+}
+function bindMdBuilder(p) {
+  const rr = () => { p._scroll = scrollY; render(); };
+  const plus = $('#divPlus'), minus = $('#divMinus');
+  if (plus) plus.onclick = () => { p.divs.push({ fmt: 'dbl', teams: [] }); p.moves.push(1); rr(); };
+  if (minus) minus.onclick = () => { p.divs.pop(); p.moves.pop(); rr(); };
+  app().querySelectorAll('[data-fmt]').forEach(b => b.onclick = () => { p.divs[+b.dataset.fmt].fmt = b.dataset.v; rr(); });
+  app().querySelectorAll('[data-mv]').forEach(b => b.onclick = () => { const i = +b.dataset.mv; p.moves[i] = Math.max(0, p.moves[i] + +b.dataset.d); rr(); });
+  app().querySelectorAll('[data-pickdiv]').forEach(b => b.onclick = () => {
+    const i = +b.dataset.pickdiv; const sel = new Set(p.divs[i].teams);
+    const where = id => p.divs.findIndex((d, k) => k !== i && d.teams.includes(id));
+    const rows = () => DATA.teams.map(t => { const ok = t.players.length >= 7; const w = where(t.id); const dis = !ok || w >= 0;
+      return `<button class="row ${sel.has(t.id) ? 'on' : ''}" data-dt="${t.id}" ${dis ? 'disabled style="opacity:.45"' : ''}>${crestSVG(t, 34)}<div class="grow"><div class="t1">${esc(t.name)}</div><div class="t2">${w >= 0 ? `Ya está en la ${w + 1}ª División` : ok ? `Sinergia ${t.skill}` : 'Faltan jugadoras'}</div></div><span class="chk"></span></button>`; }).join('');
+    openSheet(`<h3>${i + 1}ª División</h3><div class="card list" id="dtl" style="max-height:55vh;overflow:auto">${rows()}</div><div class="acts"><button class="btn pri" id="dok">Listo (<span id="dn">${sel.size}</span>)</button></div>`, bg => {
+      const bind = () => bg.querySelectorAll('[data-dt]').forEach(r => r.onclick = () => { const id = r.dataset.dt; sel.has(id) ? sel.delete(id) : sel.add(id); r.classList.toggle('on'); $('#dn', bg).textContent = sel.size; });
+      bind();
+      $('#dok', bg).onclick = () => { p.divs[i].teams = [...sel]; closeSheet(); rr(); };
+    });
+  });
+}
 
 /* ---------- LIGA ---------- */
 function fxRow(lg, f) {
@@ -1429,7 +1554,7 @@ function fxRow(lg, f) {
 }
 function nextCard(lg, f) {
   const H = teamById(f.home), A = teamById(f.away); const tc = teamColors(H, A);
-  return `<div class="card next duel" style="--hc:${tc[0]};--ac:${tc[1]}"><div style="display:flex;justify-content:space-between;align-items:center"><span class="chip acc">Siguiente partido</span><span class="muted up" style="font-size:12px;font-weight:600">${esc(stageLabel(f, lg))}</span></div>
+  return `<div class="card next duel" style="--hc:${tc[0]};--ac:${tc[1]}"><div style="display:flex;justify-content:space-between;align-items:center;gap:10px"><span class="chip acc" style="flex:none">Siguiente partido</span><span class="muted up" style="font-size:12px;font-weight:600;text-align:right">${esc(stageLabel(f, lg))}</span></div>
     <div class="vs"><div class="side">${crestSVG(H, 64)}<b>${esc(H.name)}</b></div><div class="mid">VS</div><div class="side">${crestSVG(A, 64)}<b>${esc(A.name)}</b></div></div>
     <button class="btn pri block" data-play="${f.id}">Preparar partido</button></div>`;
 }
@@ -1441,27 +1566,29 @@ function champCard(lg, withNext) {
     <div style="display:flex;flex-direction:column;gap:6px;font-size:14px;color:var(--muted)">${R2 ? `<span style="display:flex;align-items:center;justify-content:center;gap:6px">Subcampeón: ${crestSVG(R2, 18)}<b style="color:var(--text)">${esc(R2.name)}</b></span>` : ''}${sc ? `<span>Máxima goleadora: <b style="color:var(--text)">${esc(h.scorers.map(x => x.name).join(', '))}</b> · ${sc.goals} goles</span>` : ''}</div>
     ${withNext ? `<button class="btn pri block" id="newSeason" style="margin-top:6px">Comenzar temporada #${lg.season + 1}</button>` : ''}</div>`;
 }
-function tabFixtures(lg) {
-  const nx = nextFixture(lg);
+function tabFixtures(lg, s = lg, head) {
+  const nx = nextFixture(s);
   const groups = {};
-  lg.fixtures.slice().sort((a, b) => stageOrder(a) - stageOrder(b) || a.round - b.round || (a.tie || 0) - (b.tie || 0)).forEach(f => {
+  s.fixtures.slice().sort((a, b) => stageOrder(a) - stageOrder(b) || a.round - b.round || (a.tie || 0) - (b.tie || 0)).forEach(f => {
     const k = f.stage === 'L' ? 'L' + f.round : f.stage === 'SF' ? 'SF' + f.round : 'F';
     (groups[k] = groups[k] || { f: [], t: f.stage === 'L' ? 'Jornada ' + f.round : f.stage === 'SF' ? 'Semifinales · ' + (f.round === 1 ? 'Ida' : 'Vuelta') : 'Final', rd: f.round, st: f.stage }).f.push(f);
   });
   const gs = Object.values(groups).map(g => {
-    const bye = g.st === 'L' && lg.byes && lg.byes[g.rd] ? `<span>Descansa: ${esc(teamById(lg.byes[g.rd])?.abbr || '')}</span>` : '<span></span>';
+    const bye = g.st === 'L' && s.byes && s.byes[g.rd] ? `<span>Descansa: ${esc(teamById(s.byes[g.rd])?.abbr || '')}</span>` : '<span></span>';
     return `<div class="card"><div class="rd-t"><span>${g.t}</span>${bye}</div><div class="list">${g.f.map(f => fxRow(lg, f)).join('')}</div></div>`;
   }).join('');
   const pend = lg.type === 'po' && leagueDone(lg) && !lg.fixtures.some(f => f.stage === 'SF') ? '' : '';
-  return `${lg.champion ? champCard(lg, true) : `<div class="muted up" style="font-size:12px;font-weight:700;margin:0 2px -6px">Temporada #${lg.season || 1}</div>`}${nx ? nextCard(lg, nx) : ''}${pend}${gs}`;
+  const top = head !== undefined ? head : (lg.champion ? champCard(lg, true) : `<div class="muted up" style="font-size:12px;font-weight:700;margin:0 2px -6px">Temporada #${lg.season || 1}</div>`);
+  return `${top}${nx ? nextCard(lg, nx) : ''}${pend}${gs}`;
 }
-function tabTable(lg) {
-  const st = standings(lg); const done = leagueDone(lg);
+function tabTable(lg, s = lg, z) {
+  const st = standings(s); const done = leagueDone(s);
   const rows = st.map((r, i) => {
-    const T = teamById(r.id); const q = lg.type === 'po' && i < 4; const ch = lg.type === 'dbl' && done && i === 0;
-    return `<tr class="${ch ? 'champ' : q ? 'q' : ''}"><td class="pos">${i + 1}</td><td class="tm"><div>${crestSVG(T, 24)}<span>${esc(T ? T.name : '?')}</span></div></td><td>${r.pj}</td><td>${r.g}</td><td>${r.e}</td><td>${r.p}</td><td class="muted">${r.gf}:${r.gc}</td><td>${r.gf - r.gc > 0 ? '+' : ''}${r.gf - r.gc}</td><td class="pts">${r.pts}</td></tr>`;
+    const T = teamById(r.id); const q = lg.type === 'po' && i < 4; const ch = (lg.type === 'dbl' || (z && z.champ)) && done && i === 0;
+    const zc = z ? (i < z.up ? 'zup' : i >= st.length - z.down ? 'zdown' : '') : '';
+    return `<tr class="${ch ? 'champ' : q ? 'q' : zc}"><td class="pos">${i + 1}</td><td class="tm"><div>${crestSVG(T, 24)}<span>${esc(T ? T.name : '?')}</span></div></td><td>${r.pj}</td><td>${r.g}</td><td>${r.e}</td><td>${r.p}</td><td class="muted">${r.gf}:${r.gc}</td><td>${r.gf - r.gc > 0 ? '+' : ''}${r.gf - r.gc}</td><td class="pts">${r.pts}</td></tr>`;
   }).join('');
-  const leg = lg.type === 'po' ? `<div class="legend"><span><i style="background:var(--accent2)"></i>Play-offs</span><span>Desempate: DG, goles a favor, sorteo</span></div>` : `<div class="legend"><span>Desempate: diferencia de gol, goles a favor, sorteo</span></div>`;
+  const leg = z ? `<div class="legend" style="flex-wrap:wrap">${z.champ ? '<span><i style="background:var(--gold)"></i>Campeón</span>' : ''}${z.up ? '<span><i style="background:var(--good)"></i>Asciende</span>' : ''}${z.down ? '<span><i style="background:var(--rc)"></i>Desciende</span>' : ''}<span>Desempate: DG, goles a favor, sorteo</span></div>` : lg.type === 'po' ? `<div class="legend"><span><i style="background:var(--accent2)"></i>Play-offs</span><span>Desempate: DG, goles a favor, sorteo</span></div>` : `<div class="legend"><span>Desempate: diferencia de gol, goles a favor, sorteo</span></div>`;
   return `<div class="card"><div class="tblwrap"><table class="tbl"><thead><tr><th>#</th><th style="text-align:left">Equipo</th><th>PJ</th><th>G</th><th>E</th><th>P</th><th>Goles</th><th>DG</th><th>Pts</th></tr></thead><tbody>${rows}</tbody></table></div>${leg}</div>`;
 }
 function leaderBlock(title, arr, valFn, subFn) {
@@ -1505,22 +1632,42 @@ function tabPlayoffs(lg) {
   } else fin = `<div class="sec-t"><h2>Final</h2></div><div class="card empty" style="padding:18px"><p>Se juega entre las ganadoras de las semifinales.</p></div>`;
   return `${lg.champion ? champCard(lg) : ''}<div class="sec-t"><h2>Semifinales</h2><span class="muted" style="font-size:13px">Ida y vuelta</span></div><div class="br">${ties.map(t => tieCard(lg, t)).join('')}</div>${fin}`;
 }
+function mdHead(lg, i) {
+  const d = lg.divs[i];
+  const label = `<div class="muted up" style="font-size:12px;font-weight:700;margin:0 2px -6px">Temporada #${lg.season} · ${esc(d.name)} · ${d.fmt === 'dbl' ? 'Ida y vuelta' : 'Una vuelta'}</div>`;
+  if (lg.champion) {
+    const mv = mdMovements(lg); const T = teamById(lg.champion);
+    const names = ids => ids.map(id => esc(teamById(id)?.name || '?')).join(', ');
+    const lines = lg.divs.map((dv, k) => `<div class="mdsum"><b>${esc(dv.name)}</b><span>Campeón: ${esc(teamById(dv.champion)?.name || '?')}</span>${mv[k].up.length ? `<span class="upc">▲ Suben: ${names(mv[k].up)}</span>` : ''}${mv[k].down.length ? `<span class="downc">▼ Bajan: ${names(mv[k].down)}</span>` : ''}</div>`).join('');
+    return `<div class="card champ-card">${IC.trophy.replace('<svg', '<svg width="40" height="40" style="color:var(--gold)"')}<span class="k">Campeón · Temporada #${lg.season}</span>${crestSVG(T, 84)}<span class="t">${esc(T ? T.name : '?')}</span><div style="display:flex;flex-direction:column;gap:10px;width:100%;text-align:left">${lines}</div><button class="btn pri block" id="newSeason" style="margin-top:6px">Comenzar temporada #${lg.season + 1}</button></div>`;
+  }
+  if (d.champion) { const T = teamById(d.champion); return `${label}<div class="card" style="padding:12px 14px;display:flex;align-items:center;gap:12px;border-color:rgba(255,201,64,.4)">${crestSVG(T, 40)}<div style="flex:1"><div class="up" style="font-size:11px;font-weight:700;color:var(--gold)">Campeón de la ${esc(d.name)}</div><div style="font-weight:700">${esc(T ? T.name : '?')}</div><div class="muted" style="font-size:12px">Faltan partidos en otras divisiones para cerrar la temporada.</div></div></div>`; }
+  return label;
+}
 SCREENS.league = {
   html(p) {
     const lg = leagueById(p.id); if (!lg) return `${topbar('Liga')}<main class="content"><div class="card empty"><p>Esta liga ya no existe.</p></div></main>`;
     const tabs = [['fx', 'Partidos'], ['tb', 'Tabla'], ['st', 'Stats']]; if (lg.type === 'po') tabs.push(['po', 'Play-offs']);
-    const body = p.tab === 'tb' ? tabTable(lg) : p.tab === 'st' ? tabStats(lg) : p.tab === 'po' ? tabPlayoffs(lg) : tabFixtures(lg);
+    let body, divRow = '';
+    if (isMD(lg)) {
+      p.div = Math.min(p.div || 0, lg.divs.length - 1); const i = p.div; const s = divSub(lg, i);
+      divRow = `<div class="divchips">${lg.divs.map((d, k) => `<button class="${k === i ? 'on' : ''}" data-div="${k}">${k + 1}ª${d.champion ? ' ✓' : ''}</button>`).join('')}</div>`;
+      const z = { champ: i === 0, up: i > 0 ? lg.moves[i - 1] || 0 : 0, down: i < lg.divs.length - 1 ? lg.moves[i] || 0 : 0 };
+      body = p.tab === 'tb' ? tabTable(lg, s, z) : p.tab === 'st' ? tabStats(s) : tabFixtures(lg, s, mdHead(lg, i));
+    } else body = p.tab === 'tb' ? tabTable(lg) : p.tab === 'st' ? tabStats(lg) : p.tab === 'po' ? tabPlayoffs(lg) : tabFixtures(lg);
     return `${topbar(lg.name, { right: `<button class="iconbtn" id="lgHist" aria-label="Historial">${IC.hist}</button><button class="iconbtn" id="lgMenu" aria-label="Opciones">${IC.dots}</button>` })}<main class="content notab">
-      <div class="stickyseg"><div class="seg">${tabs.map(([k, l]) => `<button class="${p.tab === k ? 'on' : ''}" data-lt="${k}">${l}</button>`).join('')}</div></div>${body}</main>`;
+      <div class="stickyseg"><div class="seg">${tabs.map(([k, l]) => `<button class="${p.tab === k ? 'on' : ''}" data-lt="${k}">${l}</button>`).join('')}</div>${divRow}</div>${body}</main>`;
   },
   after(p) {
     const lg = leagueById(p.id); if (!lg) return;
     app().querySelectorAll('[data-lt]').forEach(b => b.onclick = () => { p.tab = b.dataset.lt; p._scroll = 0; render(); });
+    app().querySelectorAll('[data-div]').forEach(b => b.onclick = () => { p.div = +b.dataset.div; p._scroll = 0; render(); });
     const openFx = id => { const f = lg.fixtures.find(x => x.id === id); if (!f) return; p._scroll = scrollY; if (f.res) go('summary', { lg: lg.id, fx: f.id, tab: 'ev' }); else if (isPlayable(lg, f)) go('prematch', { lg: lg.id, fx: f.id }); else toast('Primero se juega el partido de ida'); };
     app().querySelectorAll('[data-fx]').forEach(b => b.onclick = () => openFx(b.dataset.fx));
     app().querySelectorAll('[data-play]').forEach(b => b.onclick = () => openFx(b.dataset.play));
     $('#lgHist').onclick = () => { p._scroll = scrollY; go('history', { id: lg.id }); };
-    const ns = $('#newSeason'); if (ns) ns.onclick = () => confirmSheet(`Temporada #${lg.season + 1}`, 'Se guarda esta temporada en el historial y se arma un nuevo calendario con los mismos equipos. Las suspensiones y lesiones se borran.', 'Comenzar', () => { newSeason(lg); save(); p.tab = 'fx'; p._scroll = 0; render(); toast(`Temporada #${lg.season} creada`); }, false);
+    const nsText = isMD(lg) ? 'Se guarda esta temporada en el historial, se aplican los ascensos y descensos y se arma un nuevo calendario en cada división. Las suspensiones y lesiones se borran.' : 'Se guarda esta temporada en el historial y se arma un nuevo calendario con los mismos equipos. Las suspensiones y lesiones se borran.';
+    const ns = $('#newSeason'); if (ns) ns.onclick = () => confirmSheet(`Temporada #${lg.season + 1}`, nsText, 'Comenzar', () => { newSeason(lg); save(); p.tab = 'fx'; p._scroll = 0; render(); toast(`Temporada #${lg.season} creada`); }, false);
     $('#lgMenu').onclick = () => openSheet(`<h3>${esc(lg.name)}</h3><div class="field"><label for="rn">Nombre</label><input class="inp" id="rn" value="${esc(lg.name)}" maxlength="40"></div><div class="acts"><button class="btn danger" id="del">${IC.trash.replace('<svg', '<svg width="18" height="18"')} Eliminar</button><button class="btn pri" id="ok">Guardar</button></div>`, bg => {
       $('#ok', bg).onclick = () => { lg.name = $('#rn', bg).value.trim() || lg.name; save(); closeSheet(); render(); };
       $('#del', bg).onclick = () => confirmSheet('Eliminar liga', `Se borrará "${lg.name}" con todos sus resultados. No se puede deshacer.`, 'Eliminar', () => { DATA.leagues = DATA.leagues.filter(x => x.id !== lg.id); save(); NAV.stack = [{ name: 'leagues', params: {} }]; render(); toast('Liga eliminada'); });
@@ -1541,10 +1688,11 @@ SCREENS.history = {
     const cards = H.map(h => {
       const sc = h.scorers || [];
       const scT = sc[0] ? teamById(sc[0].team.id) || sc[0].team : null;
-      return `<div class="card" style="overflow:hidden"><div style="display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid var(--line)"><span class="disp" style="font-size:34px;font-weight:800;color:var(--gold);line-height:1">#${h.n}</span><div style="flex:1"><div style="font-weight:700">Temporada #${h.n}</div><div class="muted" style="font-size:13px">${h.type === 'po' ? 'Liga + Play-offs' : 'Ida y vuelta'} · ${new Date(h.finishedAt).toLocaleDateString('es')}</div></div></div>
+      return `<div class="card" style="overflow:hidden"><div style="display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid var(--line)"><span class="disp" style="font-size:34px;font-weight:800;color:var(--gold);line-height:1">#${h.n}</span><div style="flex:1"><div style="font-weight:700">Temporada #${h.n}</div><div class="muted" style="font-size:13px">${typeLabel(h.type)} · ${new Date(h.finishedAt).toLocaleDateString('es')}</div></div></div>
         <div class="list">
           <div class="row" style="min-height:54px">${crestOf(h.champion)}<div class="grow"><div class="t2 up" style="font-size:11px;font-weight:700;color:var(--gold)">Campeón</div><div class="t1">${nameOf(h.champion)}</div></div>${IC.crown.replace('<svg', '<svg width="20" height="20"')}</div>
           ${h.runnerUp ? `<div class="row" style="min-height:54px">${crestOf(h.runnerUp)}<div class="grow"><div class="t2 up" style="font-size:11px;font-weight:700;color:#C9D3DC">Subcampeón</div><div class="t1">${nameOf(h.runnerUp)}</div></div></div>` : ''}
+          ${h.divs ? h.divs.map((dv, k) => `<div class="mdsum" style="padding:10px 14px"><b>${esc(dv.name)}</b>${k > 0 ? `<span>Campeón: ${nameOf(dv.champion)}</span>` : ''}${dv.up.length ? `<span class="upc">▲ Suben: ${dv.up.map(nameOf).join(', ')}</span>` : ''}${dv.down.length ? `<span class="downc">▼ Bajan: ${dv.down.map(nameOf).join(', ')}</span>` : ''}${k > 0 && dv.scorers[0] ? `<span>Goleadora: ${esc(dv.scorers.map(x => x.name).join(', '))} (${dv.scorers[0].goals})</span>` : ''}</div>`).join('') : ''}
           ${sc.length ? `<div class="row" style="min-height:54px">${avatar(sc[0], 36, scT)}<div class="grow"><div class="t2 up" style="font-size:11px;font-weight:700">Máxima goleadora${sc.length > 1 ? 's' : ''}</div><div class="t1">${sc.map(x => esc(x.name)).join(', ')}</div><div class="t2">${sc.map(x => esc((teamById(x.team.id) || x.team).abbr)).join(', ')}</div></div><span class="disp num" style="font-size:24px;font-weight:800">${sc[0].goals}</span>${IC.ball.replace('<svg', '<svg width="18" height="18"')}</div>` : ''}
         </div></div>`;
     }).join('');
@@ -1694,7 +1842,7 @@ SCREENS.settings = {
       <div class="sec-t"><h2>Instalar en Android</h2></div>
       <div class="card" style="padding:14px;font-size:14px;line-height:1.5"><ol style="margin:0;padding-left:20px;display:flex;flex-direction:column;gap:6px">
         <li>Abre la app en <b>Chrome</b>.</li><li>Toca el menú <b>⋮</b> y elige <b>Instalar app</b> (o <b>Añadir a pantalla de inicio</b>).</li><li>Se abrirá desde su ícono, a pantalla completa y sin internet.</li></ol></div>
-      <p class="muted" style="text-align:center;font-size:12px;margin:4px 0 0">Cancha 7 · v1.8.2</p>
+      <p class="muted" style="text-align:center;font-size:12px;margin:4px 0 0">Cancha 7 · v1.9</p>
     </main>${tabbar('settings')}`;
   },
   after() {
