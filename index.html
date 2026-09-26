@@ -433,14 +433,14 @@ const PEN = {
   DEL: { MC: 8, DEF: 18 },
 };
 function posPenalty(pos, slot) {
-  if (slot === 'POR') return pos === 'POR' ? 0 : pos === 'CUA' ? 30 : 40;
+  if (slot === 'POR') return pos === 'POR' || pos === 'CUA' ? 0 : 40; // Cualquiera también puede ir al arco
   if (pos === 'POR') return 35;
   if (pos === 'CUA' || pos === slot) return 0;
   return (PEN[pos] && PEN[pos][slot]) ?? 10;
 }
 function effSkill(p, slot) { return Math.max(1, p.skill - posPenalty(p.pos, slot)); }
 function fit(pPos, slot) {
-  if (slot === 'POR') return pPos === 'POR' ? 1 : pPos === 'CUA' ? .55 : .4;
+  if (slot === 'POR') return pPos === 'POR' || pPos === 'CUA' ? 1 : .4;
   if (pPos === 'POR') return .45;
   if (pPos === 'CUA' || pPos === slot) return 1;
   return (FIT[slot] && FIT[slot][pPos]) || .7;
@@ -480,7 +480,7 @@ function bestLineupFor(players, formation) {
       if (mask & (1 << p)) continue; any = true;
       const r = go(i + 1, mask | (1 << p));
       if (!r.a) continue;
-      const v = effSkill(players[p], slots[i]) + r.v;
+      const v = effSkill(players[p], slots[i]) - (players[p].pos === 'CUA' ? 1000 : 0) + r.v; // las Cualquiera parten en el banco salvo que falten titulares
       if (v > best.v) best = { v, a: [p, ...r.a] };
     }
     if (!any) { const r = go(i + 1, mask); best = { v: r.v, a: r.a ? [-1, ...r.a] : null }; }
@@ -490,7 +490,8 @@ function bestLineupFor(players, formation) {
   const field = r.a.map((p, i) => ({ pid: p >= 0 ? players[p].id : null, slot: slots[i] }));
   const used = new Set(r.a.filter(p => p >= 0));
   const bench = players.filter((_, i) => !used.has(i)).map(p => p.id);
-  return { formation, field, bench, value: r.v };
+  const value = field.reduce((a, f) => { const pl = players.find(x => x.id === f.pid); return a + (pl ? effSkill(pl, f.slot) : 0); }, 0);
+  return { formation, field, bench, value };
 }
 function autoLineup(team) {
   const players = (team.players || []).slice(0, 10);
@@ -1842,7 +1843,7 @@ SCREENS.settings = {
       <div class="sec-t"><h2>Instalar en Android</h2></div>
       <div class="card" style="padding:14px;font-size:14px;line-height:1.5"><ol style="margin:0;padding-left:20px;display:flex;flex-direction:column;gap:6px">
         <li>Abre la app en <b>Chrome</b>.</li><li>Toca el menú <b>⋮</b> y elige <b>Instalar app</b> (o <b>Añadir a pantalla de inicio</b>).</li><li>Se abrirá desde su ícono, a pantalla completa y sin internet.</li></ol></div>
-      <p class="muted" style="text-align:center;font-size:12px;margin:4px 0 0">Cancha 7 · v1.9.1</p>
+      <p class="muted" style="text-align:center;font-size:12px;margin:4px 0 0">Cancha 7 · v1.9.3</p>
     </main>${tabbar('settings')}`;
   },
   after() {
