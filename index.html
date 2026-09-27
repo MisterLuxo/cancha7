@@ -972,6 +972,12 @@ function finish(M) {
     const conc = M.score[1 - t];
     for (const p of onField(M, t)) { const sl = slotOf(M, p.pid); if (sl === 'POR') bump(p, conc === 0 ? 0.3 : conc === 1 ? 0.05 : 0); if (sl === 'DEF') bump(p, conc === 0 ? 0.5 : conc === 1 ? 0.15 : 0); }
   }
+  // factor resultado: todas las que jugaron en el equipo perdedor restan 0.1 por gol de diferencia (sin tope)
+  const margin = M.score[0] - M.score[1];
+  if (margin !== 0) {
+    const lt = margin > 0 ? 1 : 0;
+    for (const p of Object.values(M.players)) if (p.team === lt && p.minIn !== null) bump(p, -0.1 * Math.abs(margin));
+  }
   ev(M, { type: 'ft' });
 }
 
@@ -2083,7 +2089,7 @@ SCREENS.settings = {
       <div class="sec-t"><h2>Instalar en Android</h2></div>
       <div class="card" style="padding:14px;font-size:14px;line-height:1.5"><ol style="margin:0;padding-left:20px;display:flex;flex-direction:column;gap:6px">
         <li>Abre la app en <b>Chrome</b>.</li><li>Toca el menú <b>⋮</b> y elige <b>Instalar app</b> (o <b>Añadir a pantalla de inicio</b>).</li><li>Se abrirá desde su ícono, a pantalla completa y sin internet.</li></ol></div>
-      <p class="muted" style="text-align:center;font-size:12px;margin:4px 0 0">Cancha 7 · v2.2.2</p>
+      <p class="muted" style="text-align:center;font-size:12px;margin:4px 0 0">Cancha 7 · v2.2.3</p>
     </main>${tabbar('settings')}`;
   },
   after() {
