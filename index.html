@@ -932,7 +932,9 @@ function boostTick(M) {
     if (T.condSince == null) T.condSince = M.minute;
     // la probabilidad parte baja cuando se cumple la condición y sube con cada minuto que pasa
     const p = Math.min(0.12, 0.004 + 0.003 * (M.minute - T.condSince));
-    if (R() < p) {
+    // sin arenga en tiempo de descuento (45+x, 90+x, 105+x, 120+x)
+    const inAdded = M.minute > ({ 1: 45, 2: 90, 3: 105, 4: 120 })[M.period];
+    if (!inAdded && R() < p) {
       T.boostUsed = true; T.boost = { start: M.minute, end: M.minute + BOOST_MIN, reason };
       ev(M, { type: 'boost', team: t, pid: cap.pid, reason, phrase: cap.phrase || '', dur: BOOST_MIN });
     }
@@ -2081,7 +2083,7 @@ SCREENS.settings = {
       <div class="sec-t"><h2>Instalar en Android</h2></div>
       <div class="card" style="padding:14px;font-size:14px;line-height:1.5"><ol style="margin:0;padding-left:20px;display:flex;flex-direction:column;gap:6px">
         <li>Abre la app en <b>Chrome</b>.</li><li>Toca el menú <b>⋮</b> y elige <b>Instalar app</b> (o <b>Añadir a pantalla de inicio</b>).</li><li>Se abrirá desde su ícono, a pantalla completa y sin internet.</li></ol></div>
-      <p class="muted" style="text-align:center;font-size:12px;margin:4px 0 0">Cancha 7 · v2.2.1</p>
+      <p class="muted" style="text-align:center;font-size:12px;margin:4px 0 0">Cancha 7 · v2.2.2</p>
     </main>${tabbar('settings')}`;
   },
   after() {
