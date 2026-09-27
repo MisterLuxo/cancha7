@@ -489,6 +489,11 @@ body{background:radial-gradient(900px 420px at 10% -140px,rgba(255,122,26,.20),t
 .st-tbl td.tm span{max-width:22vw}
 .st-tbl td.tm div{gap:6px}
 
+/* v2.2.1: orden de equipos */
+.sortseg{display:flex;gap:3px;padding:3px;border-radius:10px;background:var(--surface);border:1px solid var(--line)}
+.sortseg button{min-height:30px;padding:0 9px;border-radius:7px;font:700 13px/1 var(--disp);letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.sortseg button.on{background:var(--accent);color:var(--accent-ink)}
+
 </style>
 </head><body><div id="app"></div>
 <script>
@@ -1594,7 +1599,8 @@ document.addEventListener('click', e => {
 /* ---------- LIGAS ---------- */
 const SCREENS = {};
 const sampleCount = () => DATA.teams.filter(t => t.sample).length;
-function sampleBanner() {
+function sampleBanner() { return ''; }
+function sampleBannerOld() {
   const n = sampleCount();
   return n ? `<div class="banner"><div class="grow">Quedan <b>${n} ${n === 1 ? 'equipo' : 'equipos'} de ejemplo</b>. Bórralos cuando quieras, o edítalos y pasan a ser tuyos.</div><button class="btn sm ghost" data-clear-sample>Borrar</button></div>` : '';
 }
@@ -1929,17 +1935,23 @@ function teamMedia(t) {
 function teamTitles(id) { return DATA.leagues.reduce((a, lg) => a + (lg.history || []).filter(h => h.champion && h.champion.id === id).length, 0); }
 SCREENS.teams = {
   html() {
-    const rows = DATA.teams.map(t => {
-      const m = teamMedia(t), tt = teamTitles(t.id);
+    const sort = (DATA.settings && DATA.settings.teamSort) || 'created';
+    const med = {}; DATA.teams.forEach(t => { med[t.id] = teamMedia(t); });
+    const list = DATA.teams.slice();
+    if (sort === 'name') list.sort((a, b) => a.name.localeCompare(b.name, 'es', { sensitivity: 'base' }));
+    else if (sort === 'media') list.sort((a, b) => med[b.id] - med[a.id] || a.name.localeCompare(b.name, 'es'));
+    const rows = list.map(t => {
+      const m = med[t.id], tt = teamTitles(t.id);
       const inc = t.players.length < 9 ? `<span class="tchip warn">${t.players.length}/9</span>` : '';
       return `<button class="row trow" style="--c1:${lum(t.logo.c1) < .22 ? t.logo.c2 : t.logo.c1}" data-team="${t.id}">${crestSVG(t, 46)}<div class="grow"><div class="t1">${esc(t.name)}</div><div class="tmeta"><span class="tabbr">${esc(t.abbr)}</span><span class="tchip">Sinergia <b>${t.skill}</b></span>${tt ? `<span class="tchip gold">${IC.trophy.replace('<svg', '<svg width="12" height="12"')}<b>${tt}</b></span>` : ''}${inc}</div></div>${m ? `<div class="tmedia" style="--mc:${skillColor(m)}"><b class="num">${m}</b><small>Media</small></div>` : ''}</button>`;
     }).join('');
-    return `${topbar('Equipos', { back: false })}<main class="content">${sampleBanner()}
+    const sb = (k, l) => `<button class="${sort === k ? 'on' : ''}" data-sort="${k}">${l}</button>`;
+    return `${topbar('Equipos', { back: false, right: DATA.teams.length > 1 ? `<div class="sortseg" role="group" aria-label="Ordenar">${sb('created', 'Creado')}${sb('name', 'Nombre')}${sb('media', 'Media')}</div>` : '' })}<main class="content">
       ${rows ? `<div class="card list">${rows}</div>` : `<div class="card empty">${IC.shield.replace('<svg', '<svg width="44" height="44" style="color:var(--accent)"')}<p>Crea tu primer equipo: nombre, escudo y sus 9 jugadoras.</p><button class="btn pri" data-newteam>Nuevo equipo</button></div>`}
     </main>${rows ? `<button class="btn pri fab" data-newteam>${IC.plus.replace('<svg', '<svg width="20" height="20"')} Nuevo equipo</button>` : ''}${tabbar('teams')}`;
   },
   after() {
-    bindSampleBanner();
+    app().querySelectorAll('[data-sort]').forEach(b => b.onclick = () => { DATA.settings.teamSort = b.dataset.sort; save(); render(); });
     app().querySelectorAll('[data-team]').forEach(b => b.onclick = () => go('team', { id: b.dataset.team }));
     app().querySelectorAll('[data-newteam]').forEach(b => b.onclick = () => go('team', { id: null }));
   },
@@ -2018,7 +2030,7 @@ function playerSheet(p, pl, num) {
     <div class="photo-pick"><label style="cursor:pointer;position:relative" aria-label="Cambiar foto"><span id="phv">${avatar(w, 84, d, 'sq')}</span><span style="position:absolute;right:-6px;bottom:-6px;width:32px;height:32px;border-radius:50%;background:var(--accent);color:var(--accent-ink);display:grid;place-items:center">${IC.cam.replace('<svg', '<svg width="18" height="18"')}</span><input type="file" id="ph" accept="image/*" hidden></label>
     <div style="flex:1;font-size:13px" class="muted">Toca para elegir una foto. Se recorta en cuadrado (1:1). Si es PNG con fondo transparente, se mantiene transparente.${w.photo ? '<br><button id="rmph" style="color:var(--rc);font-weight:600;margin-top:6px">Quitar foto</button>' : ''}</div></div>
     <button class="capbtn ${d.captain === w.id ? 'on' : ''}" id="pcap" type="button"><span class="cc">C</span><div style="flex:1"><div style="font-weight:700">Capitana del equipo</div><div class="muted" style="font-size:13px">${d.captain && d.captain !== w.id ? 'Reemplaza a la capitana actual' : 'Lleva la C en su foto'}</div></div><span class="chk" style="${d.captain === w.id ? 'background:var(--gold);border-color:var(--gold)' : ''}"></span></button>
-    <div class="field"><label for="pf">Frase de arenga <span style="text-transform:none;letter-spacing:0;color:var(--faint)">(la dice cuando es capitana)</span></label><input class="inp" id="pf" maxlength="80" value="${esc(w.phrase || '')}" placeholder="Ej: ¡Nadie se rinde hoy!"></div>
+    <div class="field" id="pfWrap" ${d.captain === w.id ? '' : 'hidden'}><label for="pf">Frase de arenga <span style="text-transform:none;letter-spacing:0;color:var(--faint)">(la dice cuando es capitana)</span></label><input class="inp" id="pf" maxlength="80" value="${esc(w.phrase || '')}" placeholder="Ej: ¡Nadie se rinde hoy!"></div>
     <div class="field"><label for="pn">Nombre y apellido</label><input class="inp" id="pn" maxlength="32" value="${esc(w.name)}" placeholder="Ej: Camila Soto"></div>
     <div class="grid2" style="grid-template-columns:96px 1fr"><div class="field"><label for="pd">Dorsal</label><input class="inp num" id="pd" type="number" inputmode="numeric" min="1" max="99" value="${w.num}"></div>
     <div class="field"><label for="pp">Posición</label><select class="inp" id="pp">${opts}</select></div></div>
@@ -2034,7 +2046,7 @@ function playerSheet(p, pl, num) {
     };
     const rm = $('#rmph', bg); if (rm) rm.onclick = () => { w.photo = null; $('#phv', bg).innerHTML = avatar(w, 84, d, 'sq'); rm.remove(); };
     let cap = d.captain === w.id;
-    $('#pcap', bg).onclick = e => { cap = !cap; e.currentTarget.classList.toggle('on', cap); const k = e.currentTarget.querySelector('.chk'); k.style.background = cap ? 'var(--gold)' : ''; k.style.borderColor = cap ? 'var(--gold)' : ''; };
+    $('#pcap', bg).onclick = e => { cap = !cap; $('#pfWrap', bg).hidden = !cap; e.currentTarget.classList.toggle('on', cap); const k = e.currentTarget.querySelector('.chk'); k.style.background = cap ? 'var(--gold)' : ''; k.style.borderColor = cap ? 'var(--gold)' : ''; };
     const c = $('#pc', bg); if (c) c.onclick = closeSheet;
     const dl = $('#pdel', bg); if (dl) dl.onclick = () => { if (d.captain === w.id) d.captain = null; d.players = d.players.filter(x => x.id !== w.id); p.dirty = true; closeSheet(); p._scroll = scrollY; render(); };
     $('#pok', bg).onclick = () => {
@@ -2064,13 +2076,12 @@ SCREENS.settings = {
       </div>
       <div class="sec-t"><h2>Datos</h2></div>
       <div class="card list">
-        ${sampleCount() ? `<button class="row" data-clear-sample><div class="grow"><div class="t1">Borrar datos de ejemplo</div><div class="t2">Quita los 6 equipos y la liga de muestra</div></div>${IC.chev}</button>` : `<button class="row" id="addSample"><div class="grow"><div class="t1">Cargar datos de ejemplo</div><div class="t2">6 equipos y una liga para probar</div></div>${IC.chev}</button>`}
         <button class="row" id="wipe" style="color:var(--rc)"><div class="grow"><div class="t1">Borrar todo</div><div class="t2">Elimina todas las ligas, equipos y fotos</div></div></button>
       </div>
       <div class="sec-t"><h2>Instalar en Android</h2></div>
       <div class="card" style="padding:14px;font-size:14px;line-height:1.5"><ol style="margin:0;padding-left:20px;display:flex;flex-direction:column;gap:6px">
         <li>Abre la app en <b>Chrome</b>.</li><li>Toca el menú <b>⋮</b> y elige <b>Instalar app</b> (o <b>Añadir a pantalla de inicio</b>).</li><li>Se abrirá desde su ícono, a pantalla completa y sin internet.</li></ol></div>
-      <p class="muted" style="text-align:center;font-size:12px;margin:4px 0 0">Cancha 7 · v2.2</p>
+      <p class="muted" style="text-align:center;font-size:12px;margin:4px 0 0">Cancha 7 · v2.2.1</p>
     </main>${tabbar('settings')}`;
   },
   after() {
@@ -2096,7 +2107,6 @@ SCREENS.settings = {
         } catch (err) { toast('Ese archivo no es una copia de Cancha 7'); }
       }; fr.readAsText(f);
     };
-    const as = $('#addSample'); if (as) as.onclick = () => { loadSample(); render(); toast('Datos de ejemplo cargados'); };
     $('#wipe').onclick = () => confirmSheet('Borrar todo', 'Se eliminarán todas las ligas, equipos, jugadoras y fotos. No se puede deshacer.', 'Borrar todo', async () => {
       await Store.clear(); PHOTOS = {}; DATA = { teams: [], leagues: [], settings: DATA.settings, sample: false, v: 1, init: true }; await saveNow(); render(); toast('Datos borrados');
     });
@@ -2477,7 +2487,14 @@ SCREENS.summary = {
   const d = await Store.get('kv', 'data');
   if (d && d.teams) DATA = Object.assign({ settings: { vibrate: true } }, d);
   PHOTOS = await Store.all('photos') || {};
-  if (!d) loadSample();
+  // se quitan los datos de ejemplo: ligas de ejemplo y equipos de ejemplo que no se usan en tus ligas
+  if (DATA.leagues.some(l => l.sample) || DATA.teams.some(t => t.sample)) {
+    DATA.leagues = DATA.leagues.filter(l => !l.sample);
+    const used = new Set(DATA.leagues.flatMap(l => l.teams));
+    DATA.teams.filter(t => t.sample && !used.has(t.id)).forEach(t => t.players.forEach(p => p.photo && delPhoto(p.photo)));
+    DATA.teams = DATA.teams.filter(t => !t.sample || used.has(t.id));
+    DATA.teams.forEach(t => { delete t.sample; }); DATA.sample = false;
+  }
   // limpiar fotos huérfanas
   const used = new Set(); DATA.teams.forEach(t => t.players.forEach(p => p.photo && used.add(p.photo)));
   Object.keys(PHOTOS).forEach(k => { if (!used.has(k)) delPhoto(k); });
