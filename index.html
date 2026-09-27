@@ -714,7 +714,7 @@ function playMinute(M) {
         mom = (t === 0 ? 1 : -1);
       } else {
         bump(shooter, 0.12); defCredit(M, D, 0.05);
-        if (gkD) { bump(gkD, 0.2); gkD.saves++; M.stats[o].saves++; }
+        if (gkD) { bump(gkD, Math.max(0.1, 0.2 - 0.03 * M.score[t])); gkD.saves++; M.stats[o].saves++; }
         if (R() < 0.35) M.stats[t].corners++;
       }
     } else {
@@ -731,11 +731,15 @@ function playMinute(M) {
   }
 
   // Deriva del rendimiento
-  for (const tt of [0, 1]) for (const p of onField(M, tt)) {
+  // relativa al nivel del partido: la media de las jugadoras en cancha de ambos equipos
+  const all = [...onField(M, 0), ...onField(M, 1)];
+  const ref = all.reduce((a, p) => a + effOf(M, p.pid), 0) / (all.length || 1);
+  for (const p of all) {
     const e = effOf(M, p.pid);
-    bump(p, ((e - 60) / 40) * 0.011 + gauss() * 0.035);
+    bump(p, ((e - ref) / 40) * DRIFT_K + DRIFT_C + gauss() * 0.035);
   }
 }
+const DRIFT_K = 0.011, DRIFT_C = 0.002;
 const INJ_P = 0.0014; // ~1 lesión cada 8 partidos
 const INJ_FOUL_P = 0.4; // 40% de las lesiones las provoca una rival
 function injure(M, p) {
@@ -1551,7 +1555,7 @@ function playerLeagueData(lg, pid) {
   return { pl, team, cur: now, curTM: now ? (cur ? curTeamMatches : now.tm) : curTeamMatches, seasons, tot, name: pl ? pl.name : last ? last.name : '?' };
 }
 
-const APP_VER = '2.2.5';
+const APP_VER = '2.2.6';
 /* ===== Interfaz: navegación y pantallas ===== */
 const NAV = { stack: [], guard: null };
 const app = () => $('#app');
