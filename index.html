@@ -1358,11 +1358,17 @@ function applyAvailability(lg, f) {
   Object.keys(lg.out).forEach(pid => { const o = lg.out[pid]; if (tids.includes(o.team)) { o.games--; if (o.games <= 0) delete lg.out[pid]; } });
   f.res.lines.forEach(l => {
     const team = l.team === 0 ? f.home : f.away;
-    const g = Math.max(l.rc > 0 ? 1 : 0, l.inj || 0);
+    // acumulación: cada 4 amarillas en la temporada = 1 partido (las de una doble amarilla no cuentan)
+    const prev = (lg.fixtures || []).reduce((a, x) => a + (x !== f && x.res ? x.res.lines.filter(k => k.pid === l.pid).reduce((b, k) => b + ycCount(k), 0) : 0), 0);
+    const acc = Math.floor((prev + ycCount(l)) / YC_LIMIT) > Math.floor(prev / YC_LIMIT) ? 1 : 0;
+    const susp = (l.rc > 0 ? 1 : 0) + acc;
+    const g = Math.max(susp, l.inj || 0);
     if (!g) return;
-    lg.out[l.pid] = { type: l.inj ? (l.rc > 0 ? 'both' : 'inj') : 'susp', games: g, team };
+    lg.out[l.pid] = { type: l.inj ? (susp ? 'both' : 'inj') : 'susp', games: g, team, acc: acc || undefined };
   });
 }
+const YC_LIMIT = 4;
+function ycCount(l) { return l.rc > 0 && l.yc >= 2 ? 0 : (l.yc || 0); }
 /* Alineación guardada por equipo dentro de la liga */
 function restoreLineup(lg, team) {
   const pref = lg.lineups && lg.lineups[team.id];
@@ -1394,7 +1400,7 @@ function saveLineup(lg, team, L, repl) {
   };
 }
 function availablePlayers(lg, team) { return team.players.filter(p => !(lg.out && lg.out[p.id])); }
-function outLabel(o) { const n = o.games + (o.games === 1 ? ' partido' : ' partidos'); return (o.type === 'susp' ? 'Suspendida' : o.type === 'inj' ? 'Lesionada' : 'Lesionada y suspendida') + ' · ' + n; }
+function outLabel(o) { const n = o.games + (o.games === 1 ? ' partido' : ' partidos'); return (o.type === 'susp' ? (o.acc ? 'Suspendida por amarillas' : 'Suspendida') : o.type === 'inj' ? 'Lesionada' : 'Lesionada y suspendida') + ' · ' + n; }
 function standings(lg) {
   const rows = {}; lg.teams.forEach(id => { rows[id] = { id, pj: 0, g: 0, e: 0, p: 0, gf: 0, gc: 0, pts: 0, form: [] }; });
   lg.fixtures.filter(f => f.stage === 'L' && f.res).sort((a, b) => a.res.playedAt - b.res.playedAt).forEach(f => {
@@ -2089,7 +2095,7 @@ SCREENS.settings = {
       <div class="sec-t"><h2>Instalar en Android</h2></div>
       <div class="card" style="padding:14px;font-size:14px;line-height:1.5"><ol style="margin:0;padding-left:20px;display:flex;flex-direction:column;gap:6px">
         <li>Abre la app en <b>Chrome</b>.</li><li>Toca el menú <b>⋮</b> y elige <b>Instalar app</b> (o <b>Añadir a pantalla de inicio</b>).</li><li>Se abrirá desde su ícono, a pantalla completa y sin internet.</li></ol></div>
-      <p class="muted" style="text-align:center;font-size:12px;margin:4px 0 0">Cancha 7 · v2.2.3</p>
+      <p class="muted" style="text-align:center;font-size:12px;margin:4px 0 0">Cancha 7 · v2.2.4</p>
     </main>${tabbar('settings')}`;
   },
   after() {
@@ -2236,7 +2242,7 @@ SCREENS.prematch = {
       ${nField < 7 ? `<div class="banner" style="background:rgba(242,104,61,.12);border-color:rgba(242,104,61,.4)"><div class="grow">${esc(team.name)} juega con <b>${nField} jugadoras</b> por las bajas.</div></div>` : ''}
       <div class="sec-t"><h2>Suplentes</h2><span class="muted" style="font-size:12px">Entran según rendimiento</span></div>
       <div class="bench">${bench || '<span class="muted">Sin suplentes</span>'}</div>
-      ${bajas.length ? `<div class="sec-t"><h2>Bajas</h2><span class="muted num">${bajas.length}</span></div><div class="card list">${bajas.map(x => { const o = lg.out[x.id]; return `<div class="row" style="min-height:54px;opacity:.85">${avatar(x, 38, team)}<div class="grow"><div class="t1">${esc(x.name)} <span class="muted" style="font-weight:500;font-size:13px">· ${POS_SHORT[x.pos]}</span></div><div style="margin-top:4px"><span class="chip" style="${o.type === 'susp' ? 'background:rgba(255,77,94,.15);color:var(--rc)' : 'background:rgba(255,255,255,.08);color:var(--text)'}">${o.type === 'susp' ? '<span class="card-ic" style="background:var(--rc);width:9px;height:12px"></span>' : IC.inj.replace('<svg', '<svg width="14" height="14"')} ${outLabel(o)}</span></div></div></div>`; }).join('')}</div>` : ''}
+      ${bajas.length ? `<div class="sec-t"><h2>Bajas</h2><span class="muted num">${bajas.length}</span></div><div class="card list">${bajas.map(x => { const o = lg.out[x.id]; return `<div class="row" style="min-height:54px;opacity:.85">${avatar(x, 38, team)}<div class="grow"><div class="t1">${esc(x.name)} <span class="muted" style="font-weight:500;font-size:13px">· ${POS_SHORT[x.pos]}</span></div><div style="margin-top:4px"><span class="chip" style="${o.type === 'susp' ? (o.acc ? 'background:rgba(255,201,64,.15);color:var(--yc)' : 'background:rgba(255,77,94,.15);color:var(--rc)') : 'background:rgba(255,255,255,.08);color:var(--text)'}">${o.type === 'susp' ? `<span class="card-ic" style="background:var(${o.acc ? '--yc' : '--rc'});width:9px;height:12px"></span>` : IC.inj.replace('<svg', '<svg width="14" height="14"')} ${outLabel(o)}</span></div></div></div>`; }).join('')}</div>` : ''}
       <div class="card" style="padding:14px;display:flex;flex-direction:column;gap:12px"><div class="bars3">${bar('Ataque', S.att)}${bar('Medio', S.mid)}${bar('Defensa', S.def)}</div><div class="muted" style="font-size:13px">Sinergia del equipo: <b style="color:var(--text)">${team.skill}</b></div></div>
     </main><div class="bottomcta"><button class="btn pri block" id="kick" ${p.lineups.some(l => !l.field.some(s => s.pid)) ? 'disabled' : ''}>${p.lineups.some(l => !l.field.some(s => s.pid)) ? 'Un equipo no tiene jugadoras disponibles' : '¡Comenzar partido!'}</button></div>`;
   },
