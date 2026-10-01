@@ -763,7 +763,7 @@ function injure(M, p) {
     const inP = bench.reduce((a, b) => (effSkill(b, slot) > effSkill(a, slot) ? b : a));
     doSub(M, t, p, inP);
   } else {
-    p.out = true; p.minOut = M.minute;
+    p.out = true; p.minOut = M.minute; p.lastSlot = slot;
     T.field.splice(T.field.indexOf(f), 1);
     if (slot === 'POR' && T.field.length) {
       const best = T.field.reduce((a, b) => (effSkill(M.players[b.pid], 'POR') > effSkill(M.players[a.pid], 'POR') ? b : a));
@@ -839,6 +839,7 @@ function sendOff(M, p, kind) {
 function doSub(M, t, outP, inP, forceSlot) {
   const T = M.teams[t];
   const f = T.field.find(x => x.pid === outP.pid); const slot = forceSlot || f.slot;
+  outP.lastSlot = f.slot;
   f.pid = inP.pid; f.slot = slot;
   T.bench = T.bench.filter(id => id !== inP.pid);
   outP.minOut = M.minute; outP.out = true; inP.minIn = M.minute; T.subsLeft--;
@@ -973,10 +974,18 @@ function shootoutKick(M) {
 function finish(M) {
   M.done = true; M.phase = 'ft';
   for (const t of [0, 1]) for (const p of onField(M, t)) p.minOut = M.minute;
-  // valla invicta: premio a portera y defensas que terminaron en cancha
+  // valla invicta: premio a portera y defensas, proporcional a los minutos jugados (las expulsadas no lo reciben)
+  const total = Math.max(1, M.minute);
   for (const t of [0, 1]) {
     const conc = M.score[1 - t];
-    for (const p of onField(M, t)) { const sl = slotOf(M, p.pid); if (sl === 'POR') bump(p, conc === 0 ? 0.3 : conc === 1 ? 0.05 : 0); if (sl === 'DEF') bump(p, conc === 0 ? 0.5 : conc === 1 ? 0.15 : 0); }
+    if (conc > 1) continue;
+    for (const p of Object.values(M.players)) {
+      if (p.team !== t || p.minIn === null || p.rc > 0) continue;
+      const sl = M.teams[t].field.some(f => f.pid === p.pid) ? slotOf(M, p.pid) : p.lastSlot;
+      const share = clamp(((p.minOut ?? M.minute) - p.minIn) / total, 0, 1);
+      if (sl === 'POR') bump(p, (conc === 0 ? 0.3 : 0.05) * share);
+      if (sl === 'DEF') bump(p, (conc === 0 ? 0.5 : 0.15) * share);
+    }
   }
   // factor resultado: todas las que jugaron en el equipo perdedor restan 0.1 por gol de diferencia (sin tope)
   const margin = M.score[0] - M.score[1];
@@ -1555,7 +1564,7 @@ function playerLeagueData(lg, pid) {
   return { pl, team, cur: now, curTM: now ? (cur ? curTeamMatches : now.tm) : curTeamMatches, seasons, tot, name: pl ? pl.name : last ? last.name : '?' };
 }
 
-const APP_VER = '2.2.6';
+const APP_VER = '2.2.8';
 /* ===== Interfaz: navegación y pantallas ===== */
 const NAV = { stack: [], guard: null };
 const app = () => $('#app');
